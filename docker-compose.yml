@@ -1,0 +1,24 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      # The docker profile turns off the CORS exception, because nginx serves the UI and the API
+      # from one origin here and nothing is cross-origin any more.
+      SPRING_PROFILES_ACTIVE: docker
+      # Every setting is overridable this way; this is the one worth showing.
+      MUGLOAR_API_BASEURL: https://dragonsofmugloar.com/api/v2
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "8081:80"
+    depends_on:
+      backend:
+        # Waits for the backend's own healthcheck, so the first page load cannot land on a 502.
+        condition: service_healthy
+    restart: unless-stopped

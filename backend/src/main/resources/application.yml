@@ -83,3 +83,13 @@ logging:
   level:
     com.mugloar: WARN
     com.mugloar.benchmark: INFO
+
+---
+spring:
+  config:
+    activate:
+      on-profile: docker
+mugloar:
+  web:
+    # nginx proxies /api, so the browser is same-origin and no cross-origin rule is needed.
+    allowed-origins: []
