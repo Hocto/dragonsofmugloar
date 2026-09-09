@@ -6,7 +6,6 @@ import com.mugloar.application.port.MugloarApi;
 import com.mugloar.application.strategy.AdSelectionStrategy;
 import com.mugloar.application.strategy.ExpectedValueStrategy;
 import com.mugloar.application.strategy.RewardPerRiskStrategy;
-import com.mugloar.domain.SuccessModel;
 import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -21,17 +20,12 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class StrategyConfiguration {
 
-    @Bean
-    SuccessModel successModel(StrategyProperties properties) {
-        return new SuccessModel(properties.levelLift());
-    }
-
     /** Both strategies are built here; {@code mugloar.strategy.name} decides which one plays. */
     @Bean
-    AdSelectionStrategy adSelectionStrategy(SuccessModel successModel, StrategyProperties properties) {
+    AdSelectionStrategy adSelectionStrategy(StrategyProperties properties) {
         List<AdSelectionStrategy> available = List.of(
-                new ExpectedValueStrategy(successModel, properties.urgencyWeight()),
-                new RewardPerRiskStrategy(successModel));
+                new ExpectedValueStrategy(properties.urgencyWeight()),
+                new RewardPerRiskStrategy());
 
         return available.stream()
                 .filter(strategy -> strategy.name().equals(properties.name()))
@@ -49,10 +43,7 @@ public class StrategyConfiguration {
 
     @Bean
     GameOrchestrator gameOrchestrator(
-            MugloarApi api,
-            AdSelectionStrategy strategy,
-            ShopPolicy shopPolicy,
-            SuccessModel successModel) {
-        return new GameOrchestrator(api, strategy, shopPolicy, successModel);
+            MugloarApi api, AdSelectionStrategy strategy, ShopPolicy shopPolicy) {
+        return new GameOrchestrator(api, strategy, shopPolicy);
     }
 }

@@ -36,12 +36,20 @@ class RiskLevelTest {
     }
 
     @Test
-    void treatsUnrecognisedLabelsAsTheMostDangerousThing() {
+    void treatsUnrecognisedLabelsAsSomethingToLeaveAlone() {
         RiskLevel unknown = RiskLevel.fromLabel("Absolutely fine, trust me");
 
         assertThat(unknown).isEqualTo(RiskLevel.UNKNOWN);
         assertThat(unknown.isKnown()).isFalse();
-        assertThat(unknown.basePrior()).isLessThan(RiskLevel.IMPOSSIBLE.basePrior());
+        assertThat(unknown.isWorthAttempting()).isFalse();
+    }
+
+    @Test
+    void marksTheLabelsThatNeverPayOffAsNotWorthAttempting() {
+        assertThat(RiskLevel.SUICIDE_MISSION.isWorthAttempting()).isFalse();
+        assertThat(RiskLevel.IMPOSSIBLE.isWorthAttempting()).isFalse();
+        assertThat(RiskLevel.PLAYING_WITH_FIRE.isWorthAttempting()).isTrue();
+        assertThat(RiskLevel.PIECE_OF_CAKE.isWorthAttempting()).isTrue();
     }
 
     @Test
@@ -54,9 +62,9 @@ class RiskLevelTest {
         RiskLevel[] scale = RiskLevel.values();
 
         for (int i = 1; i < scale.length - 1; i++) {
-            assertThat(scale[i].basePrior())
+            assertThat(scale[i].successRate())
                     .as("%s should be no safer than %s", scale[i], scale[i - 1])
-                    .isLessThanOrEqualTo(scale[i - 1].basePrior());
+                    .isLessThanOrEqualTo(scale[i - 1].successRate());
         }
     }
 }

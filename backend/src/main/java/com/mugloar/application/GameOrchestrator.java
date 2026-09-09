@@ -8,10 +8,11 @@ import com.mugloar.domain.GameState;
 import com.mugloar.domain.PurchaseResult;
 import com.mugloar.domain.ShopItem;
 import com.mugloar.domain.SolveResult;
-import com.mugloar.domain.SuccessModel;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,8 +22,10 @@ import org.slf4j.LoggerFactory;
  * <p>Turn-at-a-time rather than a {@code while (alive)} loop on purpose: the same object then drives
  * the auto runs, the benchmark and the manual mode, and the web layer decides how fast to call it.
  *
- * <p>Only {@code solve} and {@code buy} consume a turn. Reading the board and the shop is free, so
- * this refetches both every turn instead of trying to keep a cached copy honest.
+ * <p>Only {@code solve} and {@code buy} consume a turn, but reading is not free in practice -
+ * Mugloar rate limits per IP, and fetching the board and the shop every turn was enough to trip it.
+ * The board has to be fresh. The shop listing does not: the same eleven items at the same prices
+ * come back every turn of every game, so it is fetched once per game and remembered.
  *
  * <p>No Spring annotations - it is wired in {@code StrategyConfiguration}.
  */
@@ -30,20 +33,22 @@ public final class GameOrchestrator {
 
     private static final Logger log = LoggerFactory.getLogger(GameOrchestrator.class);
 
+    /**
+     * Bounded so a long-lived server cannot accumulate one entry per game ever played. Games are
+     * evicted oldest-first by insertion order, which is close enough for a listing that is
+     * identical everywhere anyway.
+     */
+    private static final int SHOP_CACHE_LIMIT = 500;
+
     private final MugloarApi api;
     private final AdSelectionStrategy strategy;
     private final ShopPolicy shopPolicy;
-    private final SuccessModel successModel;
+    private final Map<String, List<ShopItem>> shopByGame = new ConcurrentHashMap<>();
 
-    public GameOrchestrator(
-            MugloarApi api,
-            AdSelectionStrategy strategy,
-            ShopPolicy shopPolicy,
-            SuccessModel successModel) {
+    public GameOrchestrator(MugloarApi api, AdSelectionStrategy strategy, ShopPolicy shopPolicy) {
         this.api = api;
         this.strategy = strategy;
         this.shopPolicy = shopPolicy;
-        this.successModel = successModel;
     }
 
     public String strategyName() {
@@ -59,8 +64,26 @@ public final class GameOrchestrator {
 
     public Board board(GameState state) {
         List<Ad> ads = api.messages(state.gameId());
-        List<ShopItem> shop = api.shop(state.gameId());
+        List<ShopItem> shop = shopFor(state.gameId());
         return new Board(ads, shop, strategy.rank(ads, state), shopPolicy.decide(state, shop));
+    }
+
+    private List<ShopItem> shopFor(String gameId) {
+        List<ShopItem> cached = shopByGame.get(gameId);
+        if (cached != null) {
+            return cached;
+        }
+        if (shopByGame.size() >= SHOP_CACHE_LIMIT) {
+            shopByGame.keySet().stream().findFirst().ifPresent(shopByGame::remove);
+        }
+        List<ShopItem> fetched = api.shop(gameId);
+        shopByGame.put(gameId, fetched);
+        return fetched;
+    }
+
+    /** Called when a run ends so a long-running server does not hold shop listings forever. */
+    public void forget(String gameId) {
+        shopByGame.remove(gameId);
     }
 
     /** One automatic turn: shop if the policy says so, otherwise attempt the best-scoring ad. */
@@ -88,12 +111,12 @@ public final class GameOrchestrator {
                 .filter(candidate -> candidate.adId().equals(adId))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("No such ad on the board: " + adId));
-        return solve(state, valuate(ad, state), sequence);
+        return solve(state, valuate(ad), sequence);
     }
 
     /** Manual mode: the human picked an item. */
     public TurnEvent buyById(GameState state, String itemId, long sequence) {
-        ShopItem item = api.shop(state.gameId()).stream()
+        ShopItem item = shopFor(state.gameId()).stream()
                 .filter(candidate -> candidate.id().equals(itemId))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("No such item in the shop: " + itemId));
@@ -133,11 +156,12 @@ public final class GameOrchestrator {
         return ads.stream()
                 .filter(ad -> ad.risk().isKnown())
                 .min(Comparator.comparingInt(ad -> ad.risk().ordinal()))
-                .map(ad -> valuate(ad, state));
+                .map(GameOrchestrator::valuate);
     }
 
-    private AdValuation valuate(Ad ad, GameState state) {
-        double chance = successModel.probability(ad, state);
+    /** For a hand-picked ad, or a last-resort one, there is no ranking to look the numbers up in. */
+    private static AdValuation valuate(Ad ad) {
+        double chance = ad.risk().successRate();
         return new AdValuation(ad, chance, ad.reward() * chance, 1.0, ad.reward() * chance);
     }
 

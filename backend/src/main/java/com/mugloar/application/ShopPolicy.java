@@ -17,10 +17,12 @@ import java.util.Optional;
  *       At 50 gold a potion is also the cheapest thing on the shelf. Buying one at one life is
  *       never wrong; buying one at two lives is usually right, because the alternative is playing
  *       the next few turns from behind the strategy's own survival floor, which is slow.
- *   <li><b>An upgrade once there is surplus.</b> Dragon level lifts the success chance on every
- *       future ad, so an upgrade pays off across the rest of the run rather than once. It is the
- *       compounding move, which is exactly why it goes second and not first - compounding is
- *       worthless if the run ends next turn.
+ *   <li><b>An upgrade once there is surplus.</b> This is where the score comes from. Dragon level
+ *       does not make ads easier - I measured that and it is not there - it makes them pay more.
+ *       The same "Piece of cake" is worth about 50 gold at level 2 and about 195 at level 6. So an
+ *       upgrade is not a small edge on the next attempt, it is a multiplier on every attempt for
+ *       the rest of the run. It still goes second, because a multiplier on a run that ends next
+ *       turn is worth nothing.
  *   <li><b>Nothing.</b> Buying costs a turn even when it fails, so spending gold with no reason is
  *       strictly worse than solving an ad.
  * </ol>

@@ -56,4 +56,8 @@ tasks.register<JavaExec>("benchmark") {
     if (games != null) args("--mugloar.benchmark.games=$games")
     if (strategy != null) args("--mugloar.strategy.name=$strategy")
     if (concurrency != null) args("--mugloar.benchmark.concurrency=$concurrency")
+    // -Pturnlog=true prints one line per turn, which is how the risk-scale priors were measured.
+    if (project.findProperty("turnlog") == "true") {
+        args("--logging.level.com.mugloar.application=INFO")
+    }
 }

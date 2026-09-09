@@ -6,7 +6,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.mugloar.domain.Ad;
 import com.mugloar.domain.RiskLevel;
-import com.mugloar.domain.SuccessModel;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -16,7 +15,7 @@ import org.junit.jupiter.api.Test;
  */
 class RewardPerRiskStrategyTest {
 
-    private final RewardPerRiskStrategy strategy = new RewardPerRiskStrategy(SuccessModel.DEFAULT);
+    private final RewardPerRiskStrategy strategy = new RewardPerRiskStrategy();
 
     @Test
     void ignoresExpiryEntirely() {

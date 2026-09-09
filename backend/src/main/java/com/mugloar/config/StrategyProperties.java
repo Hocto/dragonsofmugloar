@@ -7,7 +7,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * without a rebuild.
  *
  * @param name                     {@code expected-value} or {@code reward-per-risk}
- * @param levelLift                how fast dragon level pulls success chances towards certainty
  * @param urgencyWeight            how hard to favour ads that are about to expire
  * @param healingThresholdLives    buy a potion at or below this many lives
  * @param upgradeGoldReserve       gold held back after an upgrade when the shop has no potion
@@ -17,7 +16,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "mugloar.strategy")
 public record StrategyProperties(
         String name,
-        double levelLift,
         double urgencyWeight,
         int healingThresholdLives,
         int upgradeGoldReserve,

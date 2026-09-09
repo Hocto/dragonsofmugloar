@@ -35,7 +35,6 @@ mugloar:
 
   strategy:
     name: expected-value
-    level-lift: 0.16
     urgency-weight: 1.6
     healing-threshold-lives: 2
     upgrade-gold-reserve: 50

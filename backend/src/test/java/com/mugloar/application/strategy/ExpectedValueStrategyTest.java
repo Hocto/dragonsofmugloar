@@ -8,14 +8,12 @@ import com.mugloar.domain.Ad;
 import com.mugloar.domain.AdValuation;
 import com.mugloar.domain.GameState;
 import com.mugloar.domain.RiskLevel;
-import com.mugloar.domain.SuccessModel;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class ExpectedValueStrategyTest {
 
-    private final ExpectedValueStrategy strategy =
-            new ExpectedValueStrategy(SuccessModel.DEFAULT, 1.6);
+    private final ExpectedValueStrategy strategy = new ExpectedValueStrategy(1.6);
 
     @Test
     void prefersRealisticGoldOverAdvertisedGold() {
@@ -59,6 +57,15 @@ class ExpectedValueStrategyTest {
     }
 
     @Test
+    void getsStricterAsLivesRunOut() {
+        Ad middling = ad("middling", 100, 3, RiskLevel.QUITE_LIKELY);
+
+        assertThat(strategy.rank(List.of(middling), state(3, 0, 0))).isNotEmpty();
+        assertThat(strategy.rank(List.of(middling), state(2, 0, 0))).isNotEmpty();
+        assertThat(strategy.rank(List.of(middling), state(1, 0, 0))).isEmpty();
+    }
+
+    @Test
     void stillPlaysTheSafeAdsOnTheLastLife() {
         GameState oneLifeLeft = state(1, 0, 0);
         Ad safe = ad("safe", 20, 3, RiskLevel.PIECE_OF_CAKE);
@@ -70,21 +77,25 @@ class ExpectedValueStrategyTest {
     }
 
     @Test
-    void loosensUpAsLivesComeBack() {
-        Ad gamble = ad("gamble", 150, 3, RiskLevel.GAMBLE);
+    void willNotTouchTheLabelsThatNeverPayOff() {
+        // 1 success in 44 attempts for a suicide mission, 0 in 16 for impossible. A big reward is
+        // exactly the trap here, so the filter runs before the reward is ever looked at.
+        Ad hugeButHopeless = ad("hopeless", 5000, 3, RiskLevel.SUICIDE_MISSION);
+        Ad modestButReal = ad("real", 40, 3, RiskLevel.HMMM);
 
-        assertThat(strategy.rank(List.of(gamble), state(1, 0, 0))).isEmpty();
-        assertThat(strategy.rank(List.of(gamble), state(3, 0, 0))).isNotEmpty();
+        List<AdValuation> ranked = strategy.rank(List.of(hugeButHopeless, modestButReal), state(5, 0, 0));
+
+        assertThat(ranked).extracting(v -> v.ad().adId()).containsExactly("real");
     }
 
     @Test
-    void aLevelledDragonWillTakeOnAdsItWouldHaveSkipped() {
-        GameState twoLivesLevelZero = state(2, 0, 0);
-        GameState twoLivesLevelSix = state(2, 0, 6);
-        Ad hard = ad("hard", 150, 3, RiskLevel.RISKY);
+    void dragonLevelDoesNotChangeTheOdds() {
+        // Level multiplies the rewards on the board, not the chance of success. The strategy reads
+        // the reward it is given and nothing else, which is why these agree.
+        Ad ad = ad("same", 100, 3, RiskLevel.HMMM);
 
-        assertThat(strategy.rank(List.of(hard), twoLivesLevelZero)).isEmpty();
-        assertThat(strategy.rank(List.of(hard), twoLivesLevelSix)).isNotEmpty();
+        assertThat(strategy.rank(List.of(ad), state(5, 0, 0)).getFirst().score())
+                .isEqualTo(strategy.rank(List.of(ad), state(5, 0, 20)).getFirst().score());
     }
 
     @Test
@@ -100,8 +111,8 @@ class ExpectedValueStrategyTest {
 
         AdValuation valuation = strategy.select(List.of(only), state(3, 0, 0)).orElseThrow();
 
-        assertThat(valuation.successChance()).isEqualTo(RiskLevel.SURE_THING.basePrior());
-        assertThat(valuation.expectedGold()).isEqualTo(100 * RiskLevel.SURE_THING.basePrior());
+        assertThat(valuation.successChance()).isEqualTo(RiskLevel.SURE_THING.successRate());
+        assertThat(valuation.expectedGold()).isEqualTo(100 * RiskLevel.SURE_THING.successRate());
         assertThat(valuation.urgency()).isEqualTo(1.0 + 1.6 / 2);
         assertThat(valuation.score()).isEqualTo(valuation.expectedGold() * valuation.urgency());
     }
