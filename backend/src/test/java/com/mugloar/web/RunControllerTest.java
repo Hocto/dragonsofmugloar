@@ -1,0 +1,217 @@
+package com.mugloar.web;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.mugloar.application.TurnEvent;
+import com.mugloar.application.port.MugloarApiException;
+import com.mugloar.domain.GameState;
+import com.mugloar.web.dto.AdView;
+import com.mugloar.web.dto.RunView;
+import com.mugloar.web.dto.ShopAdviceView;
+import com.mugloar.web.dto.ShopItemView;
+import com.mugloar.web.dto.TurnResultView;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Bean;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+/**
+ * A slice over the controller only. The point is the HTTP contract the Vue client codes against:
+ * status codes, JSON shape, and what a failure looks like.
+ */
+@WebMvcTest(controllers = RunController.class)
+@TestPropertySource(properties = "mugloar.web.allowed-origins=")
+class RunControllerTest {
+
+    @Autowired
+    private MockMvc mvc;
+
+    @MockBean
+    private RunService runs;
+
+    @MockBean
+    private RunStreamService streams;
+
+    @TestConfiguration
+    static class Properties {
+        @Bean
+        WebProperties webProperties() {
+            return new WebProperties(
+                    List.of(), java.time.Duration.ZERO, 10, java.time.Duration.ofMinutes(1));
+        }
+    }
+
+    @Test
+    void startingARunReturns201AndTheBoard() throws Exception {
+        given(runs.start(RunMode.AUTO)).willReturn(sampleView());
+
+        mvc.perform(post("/api/runs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"mode":"AUTO"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.runId").value("g1"))
+                .andExpect(jsonPath("$.mode").value("AUTO"))
+                .andExpect(jsonPath("$.state.lives").value(3))
+                .andExpect(jsonPath("$.ads[0].adId").value("ad1"))
+                .andExpect(jsonPath("$.ads[0].difficultyRank").value(1))
+                .andExpect(jsonPath("$.ads[0].difficultyOf").value(11))
+                .andExpect(jsonPath("$.shop[0].affordable").value(false))
+                .andExpect(jsonPath("$.shopAdvice.action").value("SKIP"));
+    }
+
+    @Test
+    void rejectsARunWithNoMode() throws Exception {
+        mvc.perform(post("/api/runs").contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("INVALID_REQUEST"))
+                .andExpect(jsonPath("$.retryable").value(false));
+    }
+
+    @Test
+    void rejectsAModeThatIsNotAMode() throws Exception {
+        mvc.perform(post("/api/runs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"mode":"CHEAT"}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void returnsTheCurrentRun() throws Exception {
+        given(runs.view("g1")).willReturn(sampleView());
+
+        mvc.perform(get("/api/runs/g1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RUNNING"))
+                .andExpect(jsonPath("$.strategy").value("expected-value"));
+    }
+
+    @Test
+    void unknownRunIs404WithAnErrorTheUiCanRender() throws Exception {
+        given(runs.view("nope")).willThrow(new RunNotFoundException("nope"));
+
+        mvc.perform(get("/api/runs/nope"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("RUN_NOT_FOUND"))
+                .andExpect(jsonPath("$.retryable").value(false));
+    }
+
+    @Test
+    void solvingAnAdPassesTheIdThroughAndReturnsTheDelta() throws Exception {
+        given(runs.solve("g1", "ad1")).willReturn(new TurnResultView(
+                TurnEvent.finished(3, state(), "Out of lives"), sampleView()));
+
+        mvc.perform(post("/api/runs/g1/solve")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"adId":"ad1"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.event.action").value("FINISHED"))
+                .andExpect(jsonPath("$.run.runId").value("g1"));
+
+        verify(runs).solve("g1", "ad1");
+    }
+
+    @Test
+    void rejectsASolveWithNoAdId() throws Exception {
+        mvc.perform(post("/api/runs/g1/solve")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"adId":"  "}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void buyingAnItemPassesTheIdThrough() throws Exception {
+        given(runs.buy("g1", "hpot")).willReturn(new TurnResultView(
+                TurnEvent.started(state()), sampleView()));
+
+        mvc.perform(post("/api/runs/g1/buy")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"itemId":"hpot"}
+                                """))
+                .andExpect(status().isOk());
+
+        verify(runs).buy("g1", "hpot");
+    }
+
+    @Test
+    void manualActionsOnAnAutoRunAreAConflictNotACrash() throws Exception {
+        willThrow(new IllegalStateException("Run g1 is playing itself; watch the stream instead"))
+                .given(runs).solve(any(), any());
+
+        mvc.perform(post("/api/runs/g1/solve")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"adId":"ad1"}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("BAD_STATE"));
+    }
+
+    @Test
+    void anUpstreamFailureIsA502TheUiIsAllowedToRetry() throws Exception {
+        given(runs.view("g1")).willThrow(new MugloarApiException("Mugloar returned 503", 503));
+
+        mvc.perform(get("/api/runs/g1"))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.error").value("UPSTREAM_ERROR"))
+                .andExpect(jsonPath("$.retryable").value(true));
+    }
+
+    @Test
+    void rateLimitingIsPassedThroughAs429() throws Exception {
+        given(runs.view("g1")).willThrow(new MugloarApiException("error code: 1015", 429));
+
+        mvc.perform(get("/api/runs/g1")).andExpect(status().isTooManyRequests());
+    }
+
+    @Test
+    void theStreamHandsTheRunToTheStreamServiceAndGoesAsync() throws Exception {
+        Run run = new Run(state(), RunMode.AUTO, "expected-value");
+        given(runs.require("g1")).willReturn(run);
+        given(streams.subscribe(run)).willReturn(new SseEmitter(1000L));
+
+        mvc.perform(get("/api/runs/g1/stream"))
+                .andExpect(status().isOk())
+                .andExpect(request().asyncStarted());
+
+        verify(streams).subscribe(run);
+    }
+
+    private static GameState state() {
+        return new GameState("g1", 3, 20, 0, 0, 0, 1);
+    }
+
+    private static RunView sampleView() {
+        return new RunView(
+                "g1", "AUTO", "RUNNING", "expected-value",
+                state(), null, null,
+                List.of(new AdView("ad1", "Help someone", 82, 7, "Piece of cake", 1, 11,
+                        false, "NONE", 0.86, 91.0, true, false)),
+                List.of(new ShopItemView("hpot", "Healing potion", 50, false, true, false)),
+                new ShopAdviceView("SKIP", null, "nothing worth buying at 20 gold"),
+                List.of());
+    }
+}

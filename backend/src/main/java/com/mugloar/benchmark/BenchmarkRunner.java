@@ -13,6 +13,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.locks.ReentrantLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
@@ -26,8 +27,10 @@ import org.springframework.stereotype.Component;
  * feels better" is not a claim, and because comparing two strategies needs the same harness for
  * both.
  *
- * <p>Concurrency is capped by a semaphore rather than by the thread pool: Mugloar rate limits, and
- * pushing four games at once is roughly where 429s stop being the dominant cost.
+ * <p>Two separate throttles, because there are two separate limits. A semaphore caps how many games
+ * are in flight, and a stagger caps how fast new ones start - Cloudflare answers a burst of
+ * POST /game/start with "error code: 1015" and then ignores you for a while, which no retry budget
+ * can outrun. Pacing the starts is the fix; retrying harder is not.
  */
 @Component
 @Profile("benchmark")
@@ -37,6 +40,8 @@ public class BenchmarkRunner implements CommandLineRunner {
 
     private final GameOrchestrator orchestrator;
     private final BenchmarkProperties properties;
+    private final ReentrantLock startLock = new ReentrantLock();
+    private volatile long nextStartAllowedAt;
 
     public BenchmarkRunner(GameOrchestrator orchestrator, BenchmarkProperties properties) {
         this.orchestrator = orchestrator;
@@ -81,7 +86,7 @@ public class BenchmarkRunner implements CommandLineRunner {
     private void playOne(int gameNumber, List<Integer> scores, List<String> failures) {
         GameState state = null;
         try {
-            state = orchestrator.start();
+            state = staggeredStart();
             long sequence = 0;
             while (!state.isOver()) {
                 TurnEvent event = orchestrator.playTurn(state, ++sequence);
@@ -99,6 +104,24 @@ public class BenchmarkRunner implements CommandLineRunner {
             failures.add("game %d: %s".formatted(gameNumber, e.getMessage()));
             log.warn("game {}/{} aborted at score={} status={}",
                     gameNumber, properties.games(), state == null ? 0 : state.score(), e.status());
+        }
+    }
+
+    /** Serialises game starts and spaces them out; everything after the start runs in parallel. */
+    private GameState staggeredStart() {
+        startLock.lock();
+        try {
+            long waitMillis = nextStartAllowedAt - System.currentTimeMillis();
+            if (waitMillis > 0) {
+                Thread.sleep(waitMillis);
+            }
+            nextStartAllowedAt = System.currentTimeMillis() + properties.startStagger().toMillis();
+            return orchestrator.start();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while pacing game starts", e);
+        } finally {
+            startLock.unlock();
         }
     }
 
