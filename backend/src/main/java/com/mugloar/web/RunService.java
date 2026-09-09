@@ -54,10 +54,14 @@ public class RunService {
         this.investigateEveryTurns = strategyProperties.investigateReputationEveryTurns();
     }
 
+    private static final Board NO_BOARD =
+            new Board(List.of(), List.of(), List.of(), new ShopDecision.Skip("Run is over"));
+
     public RunView start(RunMode mode) {
         GameState state = orchestrator.start();
         Run run = registry.register(state, mode, orchestrator.strategyName());
         run.record(TurnEvent.started(state));
+        run.board(orchestrator.board(state));
         if (mode == RunMode.AUTO) {
             runners.submit(() -> playToTheEnd(run));
         }
@@ -70,30 +74,47 @@ public class RunService {
 
     public TurnResultView solve(String runId, String adId) {
         Run run = requireManualAndRunning(runId);
-        TurnEvent event = orchestrator.solveById(run.state(), adId, run.nextSequence());
-        run.record(event);
-        finishIfDead(run);
-        return new TurnResultView(event, view(run));
+        TurnEvent event = orchestrator.solveById(run.state(), board(run), adId, run.nextSequence());
+        return afterManualTurn(run, event);
     }
 
     public TurnResultView buy(String runId, String itemId) {
         Run run = requireManualAndRunning(runId);
-        TurnEvent event = orchestrator.buyById(run.state(), itemId, run.nextSequence());
-        run.record(event);
-        finishIfDead(run);
-        return new TurnResultView(event, view(run));
+        TurnEvent event = orchestrator.buyById(run.state(), board(run), itemId, run.nextSequence());
+        return afterManualTurn(run, event);
     }
 
     public Run require(String runId) {
         return registry.require(runId);
     }
 
+    private TurnResultView afterManualTurn(Run run, TurnEvent event) {
+        run.record(event);
+        finishIfDead(run);
+        run.board(run.isRunning() ? orchestrator.board(run.state()) : null);
+        return new TurnResultView(event, view(run));
+    }
+
     private RunView view(Run run) {
-        // A finished run has no live board to fetch, and asking for one would 404 or waste a call.
-        Board board = run.isRunning()
-                ? orchestrator.board(run.state())
-                : new Board(List.of(), List.of(), List.of(), new ShopDecision.Skip("Run is over"));
-        return mapper.toView(run, board);
+        return mapper.toView(run, run.isRunning() ? board(run) : NO_BOARD);
+    }
+
+    /**
+     * The board the run last acted on, fetched only if there is not one yet.
+     *
+     * <p>Nothing on the board moves between turns, so serving the cached copy is both cheaper and
+     * no less correct. It matters because an auto run redraws the board on every streamed turn, and
+     * refetching there would double this app's request rate into a per-IP limit for no new
+     * information.
+     */
+    private Board board(Run run) {
+        Board cached = run.board();
+        if (cached != null) {
+            return cached;
+        }
+        Board fresh = orchestrator.board(run.state());
+        run.board(fresh);
+        return fresh;
     }
 
     private Run requireManualAndRunning(String runId) {
@@ -110,7 +131,9 @@ public class RunService {
     private void playToTheEnd(Run run) {
         try {
             while (run.isRunning() && !run.state().isOver()) {
-                run.record(orchestrator.playTurn(run.state(), run.nextSequence()));
+                Board board = orchestrator.board(run.state());
+                run.board(board);
+                run.record(orchestrator.playTurn(run.state(), board, run.nextSequence()));
                 investigateIfDue(run);
                 pause();
             }
@@ -127,6 +150,7 @@ public class RunService {
             run.record(TurnEvent.failed(run.nextSequence(), run.state(), e.toString()));
         } finally {
             orchestrator.forget(run.id());
+            run.board(null);
         }
     }
 

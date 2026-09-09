@@ -86,12 +86,25 @@ public final class GameOrchestrator {
         shopByGame.remove(gameId);
     }
 
-    /** One automatic turn: shop if the policy says so, otherwise attempt the best-scoring ad. */
+    /** Fetches a board and plays a turn from it. The benchmark's entry point. */
     public TurnEvent playTurn(GameState state, long sequence) {
         if (state.isOver()) {
             return TurnEvent.finished(sequence, state, "No lives left");
         }
-        Board board = board(state);
+        return playTurn(state, board(state), sequence);
+    }
+
+    /**
+     * One automatic turn from a board the caller already has: shop if the policy says so, otherwise
+     * attempt the best-scoring ad.
+     *
+     * <p>Taking the board as an argument rather than fetching it is what stops the web layer from
+     * reading the message board twice per turn - once to play and once to render.
+     */
+    public TurnEvent playTurn(GameState state, Board board, long sequence) {
+        if (state.isOver()) {
+            return TurnEvent.finished(sequence, state, "No lives left");
+        }
 
         if (board.shopRecommendation() instanceof ShopDecision.Buy buy) {
             return buy(state, buy, sequence);
@@ -106,8 +119,8 @@ public final class GameOrchestrator {
     }
 
     /** Manual mode: the human picked an ad, so no strategy filtering applies. */
-    public TurnEvent solveById(GameState state, String adId, long sequence) {
-        Ad ad = api.messages(state.gameId()).stream()
+    public TurnEvent solveById(GameState state, Board board, String adId, long sequence) {
+        Ad ad = board.ads().stream()
                 .filter(candidate -> candidate.adId().equals(adId))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("No such ad on the board: " + adId));
@@ -115,8 +128,8 @@ public final class GameOrchestrator {
     }
 
     /** Manual mode: the human picked an item. */
-    public TurnEvent buyById(GameState state, String itemId, long sequence) {
-        ShopItem item = shopFor(state.gameId()).stream()
+    public TurnEvent buyById(GameState state, Board board, String itemId, long sequence) {
+        ShopItem item = board.shop().stream()
                 .filter(candidate -> candidate.id().equals(itemId))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("No such item in the shop: " + itemId));

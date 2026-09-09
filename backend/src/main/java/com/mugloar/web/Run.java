@@ -1,5 +1,6 @@
 package com.mugloar.web;
 
+import com.mugloar.application.Board;
 import com.mugloar.application.TurnAction;
 import com.mugloar.application.TurnEvent;
 import com.mugloar.domain.GameState;
@@ -33,6 +34,12 @@ public final class Run {
     private volatile RunStatus status = RunStatus.RUNNING;
     private volatile Reputation reputation;
     private volatile String failure;
+    /**
+     * The board this run last acted on. Nothing about it changes between turns, so keeping it here
+     * means rendering a run costs no upstream call at all - which matters, because an auto run
+     * redraws on every event and Mugloar rate limits by IP.
+     */
+    private volatile Board board;
 
     Run(GameState state, RunMode mode, String strategy) {
         this.state = state;
@@ -82,6 +89,14 @@ public final class Run {
 
     void reputation(Reputation latest) {
         this.reputation = latest;
+    }
+
+    public Board board() {
+        return board;
+    }
+
+    void board(Board latest) {
+        this.board = latest;
     }
 
     /**

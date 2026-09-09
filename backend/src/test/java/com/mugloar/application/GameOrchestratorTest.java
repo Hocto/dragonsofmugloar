@@ -61,6 +61,34 @@ class GameOrchestratorTest {
     }
 
     @Test
+    void buysWhatTheCallerNamedInManualMode() {
+        FakeMugloarApi api = new FakeMugloarApi(List.of(ad("a", 40, 5, RiskLevel.PIECE_OF_CAKE)), SHOP);
+        GameOrchestrator orchestrator = orchestratorFor(api);
+        GameState current = state(4, 400, 0);
+
+        TurnEvent event = orchestrator.buyById(current, orchestrator.board(current), "cs", 1);
+
+        assertThat(event.action()).isEqualTo(TurnAction.BOUGHT);
+        assertThat(event.target()).isEqualTo("cs");
+        assertThat(event.delta().level()).isEqualTo(1);
+        assertThat(event.delta().gold()).isEqualTo(-100);
+    }
+
+    @Test
+    void playsFromABoardTheCallerAlreadyHasWithoutRefetchingIt() {
+        FakeMugloarApi api = new FakeMugloarApi(List.of(ad("a", 40, 5, RiskLevel.PIECE_OF_CAKE)), SHOP)
+                .solvesWillGo(true);
+        GameOrchestrator orchestrator = orchestratorFor(api);
+        GameState current = state(5, 0, 0);
+        Board board = orchestrator.board(current);
+
+        orchestrator.playTurn(current, board, 1);
+
+        // One read of the message board in total: the one the caller did.
+        assertThat(api.calls()).filteredOn("messages"::equals).hasSize(1);
+    }
+
+    @Test
     void fetchesTheShopOnceAndTheBoardEveryTurn() {
         FakeMugloarApi api = new FakeMugloarApi(List.of(ad("a", 40, 5, RiskLevel.PIECE_OF_CAKE)), SHOP)
                 .solvesWillGo(true, true, true);
@@ -149,7 +177,10 @@ class GameOrchestratorTest {
                 SHOP)
                 .solvesWillGo(false);
 
-        TurnEvent event = orchestratorFor(api).solveById(state(1, 0, 0), "reckless", 1);
+        GameOrchestrator orchestrator = orchestratorFor(api);
+        GameState current = state(1, 0, 0);
+        TurnEvent event =
+                orchestrator.solveById(current, orchestrator.board(current), "reckless", 1);
 
         assertThat(event.target()).isEqualTo("reckless");
         assertThat(event.success()).isFalse();
@@ -160,7 +191,11 @@ class GameOrchestratorTest {
     void manualSolveOfSomethingNotOnTheBoardIsARequestError() {
         FakeMugloarApi api = new FakeMugloarApi(List.of(ad("a", 40, 5, RiskLevel.PIECE_OF_CAKE)), SHOP);
 
-        assertThatThrownBy(() -> orchestratorFor(api).solveById(state(3, 0, 0), "ghost", 1))
+        GameOrchestrator orchestrator = orchestratorFor(api);
+        GameState current = state(3, 0, 0);
+        Board board = orchestrator.board(current);
+
+        assertThatThrownBy(() -> orchestrator.solveById(current, board, "ghost", 1))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("ghost");
     }
