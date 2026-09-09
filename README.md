@@ -143,7 +143,11 @@ moved the numbers was measuring the labels rather than reasoning about them: the
 my guessed risk scale had a median of 2,323 across thirteen runs, against 3,934 with the measured
 one.
 
-NO_UPGRADES_BLOCK
+One more measurement, because it explains where the points come from. With the shop policy set to
+buy healing and never upgrade — same strategy, same everything else — four runs scored 791, 865,
+1,905 and 1,945. Four runs is not a benchmark and I am calling it what it is, but next to a median
+of 3,934 with upgrades on, and next to the reward numbers above, the picture is consistent:
+levelling is the engine, and ad selection is steering.
 
 Failures are worth naming rather than averaging away. Mugloar sits behind Cloudflare and answers a
 burst of requests with `error code: 1015`, which is not a normal 429 and outlasts any sane retry
