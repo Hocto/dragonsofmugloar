@@ -31,6 +31,9 @@ public class RunService {
 
     private static final Logger log = LoggerFactory.getLogger(RunService.class);
 
+    private static final Board NO_BOARD =
+            new Board(List.of(), List.of(), List.of(), new ShopDecision.Skip("Run is over"));
+
     private final GameOrchestrator orchestrator;
     private final MugloarApi api;
     private final RunRegistry registry;
@@ -54,9 +57,6 @@ public class RunService {
         this.investigateEveryTurns = strategyProperties.investigateReputationEveryTurns();
     }
 
-    private static final Board NO_BOARD =
-            new Board(List.of(), List.of(), List.of(), new ShopDecision.Skip("Run is over"));
-
     public RunView start(RunMode mode) {
         GameState state = orchestrator.start();
         Run run = registry.register(state, mode, orchestrator.strategyName());
@@ -72,16 +72,31 @@ public class RunService {
         return view(registry.require(runId));
     }
 
+    /**
+     * Manual turns are serialised per run.
+     *
+     * <p>The UI disables the board while a solve is in flight, but the API is reachable without the
+     * UI, and two turns racing would spend two turns off one board and interleave their state
+     * updates. One lock per run is cheap and there is only ever one player behind it.
+     */
     public TurnResultView solve(String runId, String adId) {
-        Run run = requireManualAndRunning(runId);
-        TurnEvent event = orchestrator.solveById(run.state(), board(run), adId, run.nextSequence());
-        return afterManualTurn(run, event);
+        Run run = registry.require(runId);
+        synchronized (run) {
+            requireManualAndRunning(run);
+            TurnEvent event =
+                    orchestrator.solveById(run.state(), board(run), adId, run.nextSequence());
+            return afterManualTurn(run, event);
+        }
     }
 
     public TurnResultView buy(String runId, String itemId) {
-        Run run = requireManualAndRunning(runId);
-        TurnEvent event = orchestrator.buyById(run.state(), board(run), itemId, run.nextSequence());
-        return afterManualTurn(run, event);
+        Run run = registry.require(runId);
+        synchronized (run) {
+            requireManualAndRunning(run);
+            TurnEvent event =
+                    orchestrator.buyById(run.state(), board(run), itemId, run.nextSequence());
+            return afterManualTurn(run, event);
+        }
     }
 
     public Run require(String runId) {
@@ -117,15 +132,14 @@ public class RunService {
         return fresh;
     }
 
-    private Run requireManualAndRunning(String runId) {
-        Run run = registry.require(runId);
+    private static void requireManualAndRunning(Run run) {
         if (run.mode() != RunMode.MANUAL) {
-            throw new IllegalStateException("Run " + runId + " is playing itself; watch the stream instead");
+            throw new IllegalStateException(
+                    "Run " + run.id() + " is playing itself; watch the stream instead");
         }
         if (!run.isRunning()) {
-            throw new IllegalStateException("Run " + runId + " is already over");
+            throw new IllegalStateException("Run " + run.id() + " is already over");
         }
-        return run;
     }
 
     private void playToTheEnd(Run run) {
