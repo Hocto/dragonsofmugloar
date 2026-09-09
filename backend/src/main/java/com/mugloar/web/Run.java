@@ -105,8 +105,18 @@ public final class Run {
         listeners.forEach(listener -> listener.accept(event));
     }
 
-    void onEvent(Consumer<TurnEvent> listener) {
+    /**
+     * Takes a snapshot of everything that has happened and starts listening for what happens next,
+     * both under the same lock.
+     *
+     * <p>Doing these separately loses events: a turn recorded between the snapshot and the
+     * subscription is in neither. Under one lock the worst case flips to a duplicate rather than a
+     * gap, and duplicates are already free - every event is numbered and the client drops sequence
+     * numbers it has seen.
+     */
+    synchronized List<TurnEvent> replayAndSubscribe(Consumer<TurnEvent> listener) {
         listeners.add(listener);
+        return List.copyOf(events);
     }
 
     void removeListener(Consumer<TurnEvent> listener) {

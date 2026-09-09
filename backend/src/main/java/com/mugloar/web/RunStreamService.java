@@ -3,6 +3,7 @@ package com.mugloar.web;
 import com.mugloar.application.TurnEvent;
 import java.io.IOException;
 import java.time.Duration;
+import java.util.List;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,21 +31,6 @@ public class RunStreamService {
     public SseEmitter subscribe(Run run) {
         SseEmitter emitter = new SseEmitter(timeout.toMillis());
 
-        // Replay first. If the run already ended there is nothing live to wait for, so close.
-        try {
-            for (TurnEvent event : run.events()) {
-                send(emitter, event);
-            }
-        } catch (IOException e) {
-            emitter.completeWithError(e);
-            return emitter;
-        }
-
-        if (!run.isRunning()) {
-            emitter.complete();
-            return emitter;
-        }
-
         Consumer<TurnEvent> listener = event -> {
             try {
                 send(emitter, event);
@@ -58,7 +44,25 @@ public class RunStreamService {
             }
         };
 
-        run.onEvent(listener);
+        // Snapshot and subscribe together, so a turn recorded mid-subscription is replayed rather
+        // than dropped. Anything that lands in both is filtered by sequence number on the client.
+        List<TurnEvent> history = run.replayAndSubscribe(listener);
+        try {
+            for (TurnEvent event : history) {
+                send(emitter, event);
+            }
+        } catch (IOException e) {
+            run.removeListener(listener);
+            emitter.completeWithError(e);
+            return emitter;
+        }
+
+        if (!run.isRunning()) {
+            run.removeListener(listener);
+            emitter.complete();
+            return emitter;
+        }
+
         emitter.onCompletion(() -> run.removeListener(listener));
         emitter.onTimeout(() -> {
             run.removeListener(listener);

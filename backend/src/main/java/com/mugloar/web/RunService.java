@@ -2,6 +2,7 @@ package com.mugloar.web;
 
 import com.mugloar.application.Board;
 import com.mugloar.application.GameOrchestrator;
+import com.mugloar.application.ShopDecision;
 import com.mugloar.application.TurnEvent;
 import com.mugloar.application.port.MugloarApi;
 import com.mugloar.application.port.MugloarApiException;
@@ -10,6 +11,7 @@ import com.mugloar.domain.GameState;
 import com.mugloar.web.dto.RunView;
 import com.mugloar.web.dto.TurnResultView;
 import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.slf4j.Logger;
@@ -90,8 +92,7 @@ public class RunService {
         // A finished run has no live board to fetch, and asking for one would 404 or waste a call.
         Board board = run.isRunning()
                 ? orchestrator.board(run.state())
-                : new Board(java.util.List.of(), java.util.List.of(), java.util.List.of(),
-                        new com.mugloar.application.ShopDecision.Skip("Run is over"));
+                : new Board(List.of(), List.of(), List.of(), new ShopDecision.Skip("Run is over"));
         return mapper.toView(run, board);
     }
 
@@ -124,6 +125,8 @@ public class RunService {
         } catch (RuntimeException e) {
             log.error("run.crashed gameId={}", run.id(), e);
             run.record(TurnEvent.failed(run.nextSequence(), run.state(), e.toString()));
+        } finally {
+            orchestrator.forget(run.id());
         }
     }
 
@@ -132,7 +135,8 @@ public class RunService {
      * explicitly configured. See the README for what the measurement said.
      */
     private void investigateIfDue(Run run) {
-        if (investigateEveryTurns <= 0 || run.state().turn() % investigateEveryTurns != 0) {
+        int turn = run.state().turn();
+        if (investigateEveryTurns <= 0 || turn == 0 || turn % investigateEveryTurns != 0) {
             return;
         }
         run.reputation(api.investigateReputation(run.id()));
