@@ -56,15 +56,15 @@ read plaintext messages you will never know it exists.
 
 ## How the bot decides
 
-The first version was reward divided by risk rank. It sounded reasonable and it lost most of its
-runs, for a specific reason: it had no concept of time. Ads expire. A 250-gold notice would sit on
-the board while the bot cleared 20-gold safe ones, and by the time it got round to the good one it
-was gone. Adding an urgency term — `1 + weight / expiresIn`, so an ad about to vanish is worth more
-than an identical one with six turns left — was the single change that made runs look like runs.
+The first version was reward divided by risk rank, and it had no concept of time. You could see the
+failure in the turn log: a 250-gold notice would sit on the board for six turns while the bot
+cleared 20-gold safe ones, and then expire unattempted. Adding an urgency term — `1 + weight /
+expiresIn`, so an ad about to vanish is worth more than an identical one with turns to spare — is
+what stopped that.
 
 That got me to `reward × P(success) × urgency`, and then I stopped guessing at `P(success)`. I made
-the bot log every attempt it made with the label and the outcome, played about thirty games, and
-counted. Over roughly 440 attempts:
+the bot log every attempt with the label and the outcome, played about thirty games, and counted.
+Over roughly 440 attempts:
 
 ```
 Piece of cake       80/88   0.909      Risky               13/26   0.500
@@ -109,7 +109,41 @@ shows it. That is an honest "no", not a missing feature.
 
 ## What the numbers actually look like
 
-RESULTS_BLOCK
+Thirty runs of the tuned strategy, and fifteen of the naive one it was supposed to beat:
+
+```
+                        expected-value      reward-per-risk
+  Games                     30                  15
+  Average                 3582                3744
+  Median                  3934                4072
+  Min / Max          505 / 5629         1832 / 5080
+  p10 / p90         1511 / 4983         1902 / 4824
+  Cleared 1000            93.3%              100.0%
+  Aborted upstream           0                   0
+```
+
+The full set of expected-value scores, since the shape matters more than the average: 505, 769,
+1031, 1511, 1642, 1819, 2882, 3215, 3720, 3739, 3771, 3795, 3802, 3851, 3877, 3991, 4045, 4057,
+4090, 4102, 4255, 4282, 4301, 4320, 4379, 4559, 4983, 5106, 5423, 5629. Two of those are under
+1,000 and I am not going to round them off. Both are runs that lost their first two attempts and
+never got the gold together for a first upgrade.
+
+That table is not the result I was expecting, and it is the most useful thing I measured. The
+strategy I spent the time on does not beat the naive one it was built to replace. The likely reason
+is that once the risk scale is ordered by measurement, dividing reward by risk rank already buries
+the labels that never pay — a 250-gold "Suicide mission" scores 250/11, which loses to almost
+anything — so the explicit guard I added was solving a problem the baseline had mostly solved by
+accident. What is left of the difference is the survival floor, and the floor makes the tuned
+strategy play smaller when it is behind, which on this evidence costs more than it saves.
+
+Two caveats before anyone reads too much into it. The baseline ran fifteen games to the other's
+thirty, so its tail is less explored, and the gap between the two is inside the spread of either.
+The honest summary is that I cannot show the tuned strategy is better, and the thing that actually
+moved the numbers was measuring the labels rather than reasoning about them: the same strategy with
+my guessed risk scale had a median of 2,323 across thirteen runs, against 3,934 with the measured
+one.
+
+NO_UPGRADES_BLOCK
 
 Failures are worth naming rather than averaging away. Mugloar sits behind Cloudflare and answers a
 burst of requests with `error code: 1015`, which is not a normal 429 and outlasts any sane retry
@@ -165,9 +199,16 @@ generic dark mode: the paper goes to soot and the ink to warm bone.
   The middle four labels are separated by a few percentage points on samples in the twenties and
   thirties, and I would not be surprised if a 5,000-attempt sample reordered them. The strategy is
   not very sensitive to that, but the numbers in `RiskLevel` are more confident than the data is.
-- **The urgency weight and the survival floors are hand-tuned, not swept.** I changed them, ran a
-  benchmark, kept what helped. I never ran a proper sweep, so I do not know how close to a local
-  optimum these are.
+- **The survival floor probably costs more than it saves.** It is the main thing separating the two
+  strategies and the benchmark does not show it paying for itself. Relaxing it, or making it depend
+  on how much gold is banked rather than only on lives, is the first experiment I would run.
+- **`expected-value` is still the default, and I cannot justify that on score alone.** I keep it
+  because its numbers mean something — the per-ad success chance it produces is what the UI shows
+  the player — and because it refuses hopeless ads on purpose rather than by arithmetic accident.
+  Those are design reasons, not benchmark reasons, and the benchmark is right there.
+- **The urgency weight and the floors are hand-tuned, not swept.** I changed them, ran a benchmark,
+  kept what helped. I never ran a proper sweep, so I do not know how close to a local optimum these
+  are.
 - **`RunService`'s auto-run loop has no direct test.** The turn loop underneath it does, against a
   scripted `MugloarApi`, but the thread that drives it, the SSE fan-out and the eviction policy are
   only exercised by hand. That is the next test I would write.

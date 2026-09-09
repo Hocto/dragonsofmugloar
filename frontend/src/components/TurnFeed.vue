@@ -15,7 +15,8 @@ function headline(event: TurnEvent): string {
     case 'STARTED':
       return 'Set out from the dragon den.'
     case 'BOUGHT':
-      return event.success ? `Bought ${event.target}.` : `Tried to buy ${event.target} and could not.`
+      // The detail line below carries the item name and the reason, so the headline stays short.
+      return event.success ? 'Went shopping.' : 'Could not afford it.'
     case 'FINISHED':
       return 'The run is over.'
     case 'FAILED':
