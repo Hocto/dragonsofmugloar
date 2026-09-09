@@ -16,6 +16,11 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  * <p>The {@code retryable} flag is the point. The UI has a retry button on every async action, and
  * it should only offer it when trying again could actually work - an upstream 502 yes, a
  * nonexistent ad id no.
+ *
+ * <p>Upstream detail stays in the log. The browser gets told that Mugloar misbehaved and what it
+ * can do about it, not the upstream URL, the status line or the game id embedded in the path -
+ * none of which is the browser's business, and all of which is a small gift to anyone poking at
+ * the service.
  */
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -35,9 +40,14 @@ public class ApiExceptionHandler {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(ApiError.of("GAME_GONE", "Mugloar no longer knows about this game.", false));
         }
-        HttpStatus status = e.isRateLimited() ? HttpStatus.TOO_MANY_REQUESTS : HttpStatus.BAD_GATEWAY;
-        return ResponseEntity.status(status)
-                .body(ApiError.of("UPSTREAM_ERROR", "Mugloar did not cooperate: " + e.getMessage(), true));
+        if (e.isRateLimited()) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(ApiError.of(
+                    "UPSTREAM_RATE_LIMITED",
+                    "Mugloar is rate limiting us. Give it a moment and try again.",
+                    true));
+        }
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(ApiError.of(
+                "UPSTREAM_ERROR", "Mugloar did not cooperate. Worth another try.", true));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

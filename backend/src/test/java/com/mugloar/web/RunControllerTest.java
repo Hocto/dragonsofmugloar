@@ -1,5 +1,7 @@
 package com.mugloar.web;
 
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
@@ -172,19 +174,26 @@ class RunControllerTest {
 
     @Test
     void anUpstreamFailureIsA502TheUiIsAllowedToRetry() throws Exception {
-        given(runs.view("g1")).willThrow(new MugloarApiException("Mugloar returned 503", 503));
+        given(runs.view("g1")).willThrow(new MugloarApiException(
+                "Mugloar returned 503 for GET /api/v2/secret-game-id/messages", 503));
 
         mvc.perform(get("/api/runs/g1"))
                 .andExpect(status().isBadGateway())
                 .andExpect(jsonPath("$.error").value("UPSTREAM_ERROR"))
-                .andExpect(jsonPath("$.retryable").value(true));
+                .andExpect(jsonPath("$.retryable").value(true))
+                // The upstream URL and the game id stay in the log, not in the browser.
+                .andExpect(jsonPath("$.message").value(not(containsString("secret-game-id"))))
+                .andExpect(jsonPath("$.message").value(not(containsString("/api/v2"))));
     }
 
     @Test
     void rateLimitingIsPassedThroughAs429() throws Exception {
         given(runs.view("g1")).willThrow(new MugloarApiException("error code: 1015", 429));
 
-        mvc.perform(get("/api/runs/g1")).andExpect(status().isTooManyRequests());
+        mvc.perform(get("/api/runs/g1"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.error").value("UPSTREAM_RATE_LIMITED"))
+                .andExpect(jsonPath("$.retryable").value(true));
     }
 
     @Test
