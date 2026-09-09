@@ -1,0 +1,76 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: dragonsofmugloar
+  threads:
+    # Every run holds a thread while it waits on Mugloar. Virtual threads make "a few hundred
+    # concurrent runs" a non-question instead of a tuning exercise.
+    virtual:
+      enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+mugloar:
+  api:
+    base-url: https://dragonsofmugloar.com/api/v2
+    connect-timeout: 3s
+    read-timeout: 10s
+    retry:
+      # Mugloar rate limits hard once you run games in parallel, so the retry budget is generous
+      # and the ceiling is high enough to actually wait one out.
+      max-attempts: 5
+      initial-backoff: 400ms
+      multiplier: 2.0
+      max-backoff: 8s
+
+  strategy:
+    name: expected-value
+    level-lift: 0.16
+    urgency-weight: 1.6
+    healing-threshold-lives: 2
+    upgrade-gold-reserve: 50
+    # Investigating costs a turn and nothing in the strategy reads the answer, so it is off by
+    # default. Set it to e.g. 15 to sample reputation during a run and see it in the UI.
+    investigate-reputation-every-turns: 0
+
+  benchmark:
+    games: 100
+    concurrency: 4
+    target-score: 1000
+
+  web:
+    # The dev server. In Docker the frontend is served same-origin by nginx, so this is only
+    # loosened for `npm run dev`.
+    allowed-origins: http://localhost:5173
+    # Slow enough that a person can read the turn feed, fast enough not to feel broken.
+    auto-turn-delay: 350ms
+    max-runs: 200
+    stream-timeout: 30m
+
+logging:
+  level:
+    com.mugloar: INFO
+  pattern:
+    console: "%d{HH:mm:ss.SSS} %-5level %logger{20} - %msg%n"
+
+---
+spring:
+  config:
+    activate:
+      on-profile: benchmark
+  main:
+    web-application-type: none
+logging:
+  level:
+    com.mugloar: WARN
+    com.mugloar.benchmark: INFO
