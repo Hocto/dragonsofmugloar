@@ -104,6 +104,10 @@ public class BenchmarkRunner implements CommandLineRunner {
             failures.add("game %d: %s".formatted(gameNumber, e.getMessage()));
             log.warn("game {}/{} aborted at score={} status={}",
                     gameNumber, properties.games(), state == null ? 0 : state.score(), e.status());
+        } finally {
+            if (state != null) {
+                orchestrator.forget(state.gameId());
+            }
         }
     }
 
