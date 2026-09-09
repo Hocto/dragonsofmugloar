@@ -16,7 +16,7 @@ services:
       context: .
       dockerfile: frontend/Dockerfile
     ports:
-      - "8081:80"
+      - "8088:80"
     depends_on:
       backend:
         # Waits for the backend's own healthcheck, so the first page load cannot land on a 502.

@@ -64,6 +64,8 @@ const ordered = computed(() =>
   list-style: none;
   margin: 0;
   padding: 0;
+  /* Leaving cards are absolutely positioned, so they need this to have something to sit inside. */
+  position: relative;
 }
 
 /* Give each card a slightly different tilt so the board is not a spreadsheet. */

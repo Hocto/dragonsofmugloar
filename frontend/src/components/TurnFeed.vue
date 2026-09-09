@@ -44,7 +44,13 @@ function deltaParts(event: TurnEvent): string[] {
       </span>
     </h2>
 
-    <ol class="feed__list" aria-live="polite" aria-relevant="additions">
+    <!--
+      role="log" rather than an assertive live region. An auto run produces a turn every few
+      hundred milliseconds, and announcing each one turns a screen reader into a metronome. The
+      region is navigable; the HUD and the result panel are where the important changes are said
+      out loud.
+    -->
+    <ol class="feed__list" role="log" aria-label="Turn by turn chronicle">
       <li
         v-for="event in events"
         :key="event.sequence"
