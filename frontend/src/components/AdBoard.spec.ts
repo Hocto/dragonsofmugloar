@@ -107,6 +107,22 @@ describe('AdBoard', () => {
     expect(board.findAll('button')).toHaveLength(0)
   })
 
+  it('drops expired cards straight out of the DOM when the bot is playing', async () => {
+    // The auto board is replaced two or three times a second. Animating each card in and out is
+    // churn, and a backgrounded tab pauses animation frames, which strands Vue's leave transition
+    // and leaves the elements in the DOM for as long as the run lasts.
+    const board = mountBoard({
+      actionable: false,
+      ads: [ad({ adId: 'a' }), ad({ adId: 'b' })],
+    })
+    expect(board.findAll('li')).toHaveLength(2)
+
+    await board.setProps({ ads: [ad({ adId: 'b' })] })
+
+    expect(board.findAll('li')).toHaveLength(1)
+    expect(board.html()).not.toContain('leave-active')
+  })
+
   it('says when the strategy would not touch an ad', () => {
     const board = mountBoard({
       ads: [ad({ successChance: null, skippedByStrategy: true })],

@@ -213,6 +213,13 @@ generic dark mode: the paper goes to soot and the ink to warm bone.
 - **The urgency weight and the floors are hand-tuned, not swept.** I changed them, ran a benchmark,
   kept what helped. I never ran a proper sweep, so I do not know how close to a local optimum these
   are.
+- **The board only animates in manual mode.** Watching the DOM during an auto run turned up cards
+  accumulating: the board is replaced two or three times a second, and a tab that is not rendering
+  pauses animation frames, which strands Vue's leave transition half-applied and leaves the element
+  behind. Twenty-six stranded cards by turn seventeen. Auto runs now swap the board without
+  animating it, which fixes the leak and is calmer to watch anyway. The same stall is still possible
+  in manual mode in a backgrounded tab; it resolves when you come back to it, and a manual board
+  only changes when the player acts, so I left it.
 - **`RunService`'s auto-run loop has no direct test.** The turn loop underneath it does, against a
   scripted `MugloarApi`, but the thread that drives it, the SSE fan-out and the eviction policy are
   only exercised by hand. That is the next test I would write.
