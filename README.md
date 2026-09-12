@@ -186,8 +186,13 @@ should write results somewhere instead of printing them.
 ## The look
 
 The reflex when you get handed a game API is a dark dashboard: KPI cards, a neon accent, a data
-table of ads. That is what I was reacting to. The original dragonsofmugloar.com is hand-drawn ink on
-parchment, so this is a tavern notice board. Warm paper, ink-black text, one wax red reserved for
+table of ads. That is what I was reacting to.
+
+The original dragonsofmugloar.com is not actually a parchment site — it is a photograph of a
+mountain sunset, a red display title, and a white panel of plain body text. What it does have is
+torn-edged parchment sheets with pencil sketches of dragons dropped into the middle of it, and that
+is the part worth keeping. So I took the motif the original uses as an illustration and built the
+interface out of it: this is a tavern notice board. Warm paper, ink-black text, one wax red reserved for
 anything urgent or lost, one gold reserved for money, and nothing else gets a colour — which is what
 keeps the red meaningful when an ad is about to expire. Notices are pinned slightly askew, the paper
 darkens as an ad ages, and expiring ones lift off the board rather than blinking out.
