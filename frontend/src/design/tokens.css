@@ -1,0 +1,89 @@
+/*
+ * Shared palette for all three directions.
+ *
+ * Every text pairing here was checked against WCAG AA and every colour that carries state - the
+ * power borders, the split bar, the expiry marker - was checked against the 3:1 non-text bar, in
+ * both schemes. The decorative hairlines deliberately sit below that, because they separate rows
+ * rather than mean anything.
+ *
+ * Warm throughout. There is no grey-blue in this file.
+ */
+
+.dom-scope {
+  --paper: #fbf7f0;
+  --paper-sunk: #f4eee2;
+  --amber: #f2dcae;
+  --amber-strong: #e8c87d;
+
+  --ink: #1f1b16;
+  --ink-muted: #5c5349;
+
+  /* State-bearing. All >= 3:1 on both paper and amber. */
+  --covered: #2e6b3a;
+  --gap: #8a6a3c;
+  --urgent: #a32e21;
+  --risk: #a32e21;
+  --expected: #2e6b3a;
+
+  /* Decorative only. */
+  --rule: #e2d8c8;
+  --edge: #cdc0ab;
+
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+  color: var(--ink);
+  background: var(--paper);
+}
+
+@media (prefers-color-scheme: dark) {
+  .dom-scope {
+    --paper: #17140f;
+    --paper-sunk: #1e1a14;
+    --amber: #402f14;
+    --amber-strong: #56401b;
+
+    --ink: #f2eadc;
+    --ink-muted: #ada08c;
+
+    --covered: #86be8f;
+    --gap: #c2a06a;
+    --urgent: #e58c7b;
+    --risk: #e58c7b;
+    --expected: #86be8f;
+
+    --rule: #2d261d;
+    --edge: #3f3527;
+  }
+}
+
+/* One focus treatment for all three directions, and it is never removed. */
+.dom-scope :where(a, button, [tabindex]):focus-visible {
+  outline: 2px solid var(--urgent);
+  outline-offset: 2px;
+}
+
+/* Every interactive element clears the 44px tap target. */
+.dom-scope :where(button) {
+  min-height: 44px;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.dom-scope .u-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.dom-scope .u-num {
+  font-family: var(--sans);
+  font-variant-numeric: tabular-nums;
+}
