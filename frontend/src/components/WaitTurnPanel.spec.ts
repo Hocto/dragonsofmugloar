@@ -8,7 +8,13 @@ import WaitTurnPanel from './WaitTurnPanel.vue'
  */
 function mountPanel(props: Partial<InstanceType<typeof WaitTurnPanel>['$props']> = {}) {
   return mount(WaitTurnPanel, {
-    props: { recommended: false, pending: false, disabled: false, ...props },
+    props: {
+      recommended: false,
+      pending: false,
+      disabled: false,
+      turnsUntilBoardChanges: 3,
+      ...props,
+    },
   })
 }
 
@@ -19,6 +25,23 @@ describe('WaitTurnPanel', () => {
 
   it('says so when the strategy would also wait', () => {
     expect(mountPanel({ recommended: true }).text()).toContain('Nothing here is worth the risk')
+  })
+
+  it('says how long until the board actually changes', () => {
+    // Waiting does not deal a new hand - it ages the board, and the board only changes when
+    // something expires. Without this the move looks like it does nothing.
+    expect(mountPanel({ turnsUntilBoardChanges: 3 }).text()).toContain('Board changes in 3 turns')
+  })
+
+  it('gets the singular right on the last turn before the board moves', () => {
+    const text = mountPanel({ turnsUntilBoardChanges: 1 }).text()
+
+    expect(text).toContain('Board changes in 1 turn')
+    expect(text).not.toContain('1 turns')
+  })
+
+  it('says nothing about a countdown when the board is empty', () => {
+    expect(mountPanel({ turnsUntilBoardChanges: null }).text()).not.toContain('Board changes')
   })
 
   it('keeps to one row in both states so it does not resize as the board changes', () => {

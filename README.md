@@ -109,8 +109,20 @@ That was the wrong way round. The turn cost is not the price of the feature, it 
 This API has no way to pass, but a turn can still be given up, and reputation is a call that spends
 one and risks nothing. So when the whole board sits below the survival floor and there is no gold
 for a potion, the bot now waits instead of gambling. A lost life ends the run and everything it
-would still have earned; a lost turn costs one turn. The board moves on regardless, because expiry
-ticks down and new ads appear, so waiting is genuinely a way to be dealt a different hand.
+would still have earned; a lost turn costs one turn.
+
+I then got the next part wrong too, and only caught it because someone asked the obvious question:
+if the quests do not change, what is passing for? I had assumed a fresh ad arrives each turn. It
+does not. The board holds ten notices; **solving** one drops it and a replacement appears with a
+full seven turns on it, but **waiting** drops nothing, so nothing new arrives — all it does is age
+every notice by one. I measured it: eight turns of pure waiting, ten identical ads for seven of
+them, then the whole board turning over at once when the cohort expired.
+
+That makes waiting much narrower than a reroll, and it changes the rule. The number of turns
+waiting has to buy is the soonest expiry on the board, so the bot only starts if its remaining
+budget covers that — otherwise it spends every turn it has and still ends up taking the same bad ad,
+just poorer. The player's panel shows the same number ("board changes in 3 turns"), because without
+it passing looks like it does nothing, which for any single turn is very nearly true.
 
 It is budgeted at ten turns per run rather than unlimited, for the same reason the shop policy buys
 upgrades: once a dragon is levelled a turn is worth a couple of hundred gold, and a run that waits

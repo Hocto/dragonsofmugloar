@@ -39,6 +39,14 @@ describe('GameScreen', () => {
     expect(labels[0]).toContain('Let the turn pass')
   })
 
+  it('counts down to the soonest expiry, which is when waiting pays off', () => {
+    const screen = mountScreen({
+      ads: [ad({ adId: 'a', expiresIn: 6 }), ad({ adId: 'b', expiresIn: 2 }), ad({ adId: 'c', expiresIn: 4 })],
+    })
+
+    expect(screen.text()).toContain('Board changes in 2 turns')
+  })
+
   it('urges the pass only when the strategy has refused the whole board', () => {
     const allSkipped = mountScreen({
       ads: [ad({ adId: 'a', skippedByStrategy: true }), ad({ adId: 'b', skippedByStrategy: true })],

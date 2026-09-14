@@ -30,6 +30,14 @@ const isAuto = computed(() => props.run.mode === 'AUTO')
 const nothingWorthAttempting = computed(
   () => props.run.ads.length > 0 && props.run.ads.every((ad) => ad.skippedByStrategy),
 )
+
+/**
+ * How many turns until the soonest notice expires, which is the only way waiting changes anything.
+ * Solving a quest replaces it immediately; waiting replaces nothing and only ages the board.
+ */
+const turnsUntilBoardChanges = computed<number | null>(() =>
+  props.run.ads.length > 0 ? Math.min(...props.run.ads.map((ad) => ad.expiresIn)) : null,
+)
 </script>
 
 <template>
@@ -51,6 +59,7 @@ const nothingWorthAttempting = computed(
           :recommended="nothingWorthAttempting"
           :pending="busy && !pendingAdId && !pendingItemId"
           :disabled="busy || !canAct"
+          :turns-until-board-changes="turnsUntilBoardChanges"
           @wait="emit('wait')"
         />
 

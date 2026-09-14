@@ -21,6 +21,11 @@ import java.util.function.Predicate;
  * consume a turn, a failed solve costs a life, an unaffordable purchase fails but still burns the
  * turn, and reading the board is free. Outcomes are queued rather than random, so a test can say
  * "this attempt fails" and mean it.
+ *
+ * <p>Expiry is modelled too, because the waiting logic turns on it. Every call that consumes a turn
+ * ticks each ad one closer to expiring and drops the ones that reach zero. Waiting adds no new ads,
+ * which is the measured behaviour of the real board and the reason waiting is a narrow move rather
+ * than a reroll.
  */
 public final class FakeMugloarApi implements MugloarApi {
 
@@ -95,6 +100,7 @@ public final class FakeMugloarApi implements MugloarApi {
                 .orElseThrow(() -> new MugloarApiException("no such ad", 400));
 
         boolean success = solveOutcomes.isEmpty() || solveOutcomes.poll();
+        spendTurn();
         state = new GameState(
                 current.gameId(),
                 success ? current.lives() : current.lives() - 1,
@@ -116,6 +122,7 @@ public final class FakeMugloarApi implements MugloarApi {
 
         boolean affordable = item.affordableWith(current.gold());
         // The turn is spent whether or not the purchase lands. That is the real behaviour.
+        spendTurn();
         state = new GameState(
                 current.gameId(),
                 affordable && item.isHealingPotion() ? current.lives() + 1 : current.lives(),
@@ -130,7 +137,17 @@ public final class FakeMugloarApi implements MugloarApi {
     @Override
     public Reputation investigateReputation(String gameId) {
         record("investigateReputation");
+        spendTurn();
         return Reputation.NEUTRAL;
+    }
+
+    /** One turn passes: everything on the board ages, and anything out of time falls off it. */
+    private void spendTurn() {
+        board = board.stream()
+                .map(ad -> new Ad(ad.adId(), ad.message(), ad.reward(), ad.expiresIn() - 1,
+                        ad.risk(), ad.encoding()))
+                .filter(ad -> ad.expiresIn() > 0)
+                .toList();
     }
 
     private void record(String call) {

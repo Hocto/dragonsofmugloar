@@ -13,11 +13,18 @@
  * One row in both states, so the panel does not resize when the board changes underneath it. It is
  * never disabled on the grounds that waiting looks unwise; when the strategy would also wait it
  * says so and leaves the decision alone.
+ *
+ * The countdown is the part that makes the move make sense. Waiting does not deal a new hand - the
+ * board holds ten notices, solving one replaces it, and waiting replaces nothing. All a turn does
+ * is age every notice by one, so the board changes only when something expires. Without saying how
+ * far away that is, passing looks like it does nothing, because for that turn it very nearly does.
  */
 defineProps<{
   recommended: boolean
   pending: boolean
   disabled: boolean
+  /** Turns until the soonest notice expires and is replaced. Null when the board is empty. */
+  turnsUntilBoardChanges: number | null
 }>()
 
 const emit = defineEmits<{ wait: [] }>()
@@ -30,6 +37,11 @@ const emit = defineEmits<{ wait: [] }>()
       <span class="wait__body">
         <template v-if="recommended">Nothing here is worth the risk.</template>
         <template v-else>Costs a turn, risks nothing.</template>
+        <template v-if="turnsUntilBoardChanges !== null">
+          Board changes in
+          <span class="wait__countdown numeral">{{ turnsUntilBoardChanges }}</span>
+          {{ turnsUntilBoardChanges === 1 ? 'turn' : 'turns' }}.
+        </template>
       </span>
     </p>
 
@@ -87,6 +99,10 @@ const emit = defineEmits<{ wait: [] }>()
 .wait--urged .wait__body {
   color: var(--wax);
   font-weight: 600;
+}
+
+.wait__countdown {
+  font-weight: 700;
 }
 
 .wait__action {

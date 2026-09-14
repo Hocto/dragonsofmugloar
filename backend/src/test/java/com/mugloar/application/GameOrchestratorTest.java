@@ -111,8 +111,8 @@ class GameOrchestratorTest {
 
     @Test
     void waitsOutTheTurnRatherThanGamblingItsLastLife() {
-        // One life, no gold for a potion, nothing on the board above the survival floor. Giving up
-        // the turn costs a turn; attempting anything here costs the run about half the time.
+        // One life, no gold for a potion, nothing on the board above the survival floor, and the
+        // soonest expiry is three turns away - well inside the budget, so waiting can reach it.
         FakeMugloarApi api = new FakeMugloarApi(
                 List.of(
                         ad("awful", 300, 3, RiskLevel.SUICIDE_MISSION),
@@ -143,22 +143,27 @@ class GameOrchestratorTest {
 
     @Test
     void takesTheSafestAdOnceTheWaitingBudgetIsSpent() {
-        FakeMugloarApi api = new FakeMugloarApi(
-                List.of(
-                        ad("awful", 300, 3, RiskLevel.SUICIDE_MISSION),
-                        ad("less-bad", 30, 3, RiskLevel.SURE_THING)),
-                SHOP)
+        // The budget is cumulative over the whole game, not per bad board. Waiting out one board
+        // leaves less in hand for the next, and eventually there is not enough to outlast anything.
+        FakeMugloarApi api = new FakeMugloarApi(List.of(ad("awful", 300, 2, RiskLevel.SUICIDE_MISSION)), SHOP)
                 .solvesWillGo(true);
         GameOrchestrator orchestrator = orchestratorFor(api, 2);
 
         GameState current = state(1, 0, 0);
-        assertThat(orchestrator.playTurn(current, 1).action()).isEqualTo(TurnAction.IDLED);
-        assertThat(orchestrator.playTurn(current, 2).action()).isEqualTo(TurnAction.IDLED);
+        for (int turn = 1; turn <= 2; turn++) {
+            TurnEvent event = orchestrator.playTurn(current, turn);
+            assertThat(event.action()).as("turn %d", turn).isEqualTo(TurnAction.IDLED);
+            current = event.state();
+        }
 
-        // Budget gone. Waiting forever on a board that never improves scores nothing either.
-        TurnEvent third = orchestrator.playTurn(current, 3);
-        assertThat(third.action()).isEqualTo(TurnAction.SOLVED);
-        assertThat(third.target()).isEqualTo("less-bad");
+        // Budget spent. A fresh board it cannot outlast has to be played rather than waited out.
+        api.setBoard(List.of(
+                ad("still-awful", 300, 5, RiskLevel.SUICIDE_MISSION),
+                ad("less-bad", 30, 5, RiskLevel.SURE_THING)));
+
+        TurnEvent afterwards = orchestrator.playTurn(current, 3);
+        assertThat(afterwards.action()).isEqualTo(TurnAction.SOLVED);
+        assertThat(afterwards.target()).isEqualTo("less-bad");
     }
 
     @Test
@@ -300,6 +305,58 @@ class GameOrchestratorTest {
         // A person's own choice is not explained back to them as the bot's reasoning.
         assertThat(event.description()).startsWith("Let the turn pass");
         assertThat(event.description()).doesNotContain("Nothing worth attempting");
+    }
+
+    @Test
+    void willNotWaitForABoardItCannotOutlast() {
+        // Waiting drops nothing from the board, so nothing new arrives; all it does is tick every
+        // expiry down by one. With a budget of three and the soonest expiry six turns out, waiting
+        // spends every turn it has and still ends up taking the same bad ad.
+        FakeMugloarApi api = new FakeMugloarApi(
+                List.of(
+                        ad("awful", 300, 6, RiskLevel.SUICIDE_MISSION),
+                        ad("bad", 200, 6, RiskLevel.RISKY)),
+                SHOP)
+                .solvesWillGo(true);
+
+        TurnEvent event = orchestratorFor(api, 3).playTurn(state(1, 0, 0), 1);
+
+        assertThat(event.action()).isEqualTo(TurnAction.SOLVED);
+        assertThat(event.target()).isEqualTo("bad");
+        assertThat(api.calls()).doesNotContain("investigateReputation");
+    }
+
+    @Test
+    void waitsWhenTheBudgetJustCoversTheSoonestExpiry() {
+        FakeMugloarApi api = new FakeMugloarApi(
+                List.of(
+                        ad("awful", 300, 6, RiskLevel.SUICIDE_MISSION),
+                        ad("bad", 200, 3, RiskLevel.RISKY)),
+                SHOP)
+                .solvesWillGo(true);
+
+        // Budget 3, soonest expiry 3: one ad will drop and be replaced, which is the whole point.
+        assertThat(orchestratorFor(api, 3).playTurn(state(1, 0, 0), 1).action())
+                .isEqualTo(TurnAction.IDLED);
+    }
+
+    @Test
+    void stopsWaitingAsTheBudgetRunsDownBelowTheExpiry() {
+        FakeMugloarApi api = new FakeMugloarApi(List.of(ad("bad", 200, 3, RiskLevel.RISKY)), SHOP)
+                .solvesWillGo(true);
+        GameOrchestrator orchestrator = orchestratorFor(api, 3);
+
+        // Budget and expiry fall together, one per turn, so waiting stays affordable right up to
+        // the point the ad expires and the board finally changes.
+        GameState current = state(1, 0, 0);
+        for (int turn = 1; turn <= 3; turn++) {
+            TurnEvent event = orchestrator.playTurn(current, turn);
+            assertThat(event.action()).as("turn %d", turn).isEqualTo(TurnAction.IDLED);
+            current = event.state();
+        }
+
+        // The ad has now expired off the board, leaving nothing to attempt or wait for.
+        assertThat(orchestrator.playTurn(current, 4).action()).isEqualTo(TurnAction.FAILED);
     }
 
     @Test

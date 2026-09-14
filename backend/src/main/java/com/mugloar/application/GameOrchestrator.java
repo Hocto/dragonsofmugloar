@@ -145,7 +145,7 @@ public final class GameOrchestrator {
 
         // Nothing on the board clears the survival floor, and the shop policy has already decided
         // it cannot fix that with a potion. Waiting is the remaining move.
-        if (idlingIsAvailable(state.gameId())) {
+        if (waitingCanHelp(state.gameId(), board)) {
             return idle(state, sequence, "Nothing worth attempting at %d %s"
                     .formatted(state.lives(), state.lives() == 1 ? "life" : "lives"));
         }
@@ -161,11 +161,10 @@ public final class GameOrchestrator {
      * <p>There is no "pass" in this API, but a turn can still be given up: asking for the player's
      * reputation costs one and risks nothing. When the whole board is below the survival floor and
      * there is no gold for a potion, that is a better trade than a coin flip - a lost life ends the
-     * run and everything it would still have earned, while a lost turn costs one turn. The board
-     * moves on either way, because expiry ticks down and new ads appear.
+     * run and everything it would still have earned, while a lost turn costs one turn.
      *
-     * <p>It is budgeted rather than unlimited. A run that waits forever on a board that never
-     * improves has simply found a slower way to score nothing.
+     * <p>It is a narrow move, not a reroll. See {@link #waitingCanHelp} for what waiting actually
+     * does to the board, which is less than I first assumed.
      */
     private TurnEvent idle(GameState before, long sequence, String reason) {
         Reputation reputation = api.investigateReputation(before.gameId());
@@ -186,12 +185,33 @@ public final class GameOrchestrator {
         return TurnEvent.idled(sequence, why, before, after);
     }
 
-    private boolean idlingIsAvailable(String gameId) {
-        if (maxIdleTurns <= 0) {
+    /**
+     * Whether giving up the turn can actually change anything.
+     *
+     * <p>I had assumed a fresh ad arrives every turn and that waiting therefore deals a new hand.
+     * It does not. The board holds ten ads; solving one drops it and a replacement appears, but
+     * waiting drops nothing, so nothing new arrives. All waiting does is tick every expiry down by
+     * one. The board only changes when an ad actually expires.
+     *
+     * <p>So the number of turns waiting has to buy is the soonest expiry on the board, and there is
+     * no point starting unless the remaining budget covers it - otherwise the run spends its turns
+     * and still ends up taking the same bad ad, just poorer.
+     */
+    private boolean waitingCanHelp(String gameId, Board board) {
+        int remaining = remainingIdleBudget(gameId);
+        if (remaining <= 0) {
             return false;
         }
+        return board.ads().stream()
+                .mapToInt(Ad::expiresIn)
+                .min()
+                // An empty board has nothing to wait out, but nothing to attempt either.
+                .orElse(0) <= remaining;
+    }
+
+    private int remainingIdleBudget(String gameId) {
         GameMemory memory = memoryByGame.get(gameId);
-        return memory == null || memory.idlesUsed() < maxIdleTurns;
+        return maxIdleTurns - (memory == null ? 0 : memory.idlesUsed());
     }
 
     /** Manual mode: the human picked an ad, so no strategy filtering applies. */
