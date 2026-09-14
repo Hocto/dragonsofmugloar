@@ -6,8 +6,13 @@
  * it when every notice on the board is a bad bet. Manual mode promises the same board, the same
  * shop and the same moves, so it gets the same option.
  *
- * It is never disabled on the grounds that waiting looks unwise - the player decides. When the
- * strategy would also wait, the panel says so rather than deciding for them.
+ * It sits above the board rather than below it. The moment you need it most is the moment the whole
+ * board is a bad bet, and burying it under ten quest cards meant scrolling past every tempting
+ * mistake to reach it - and tabbing through ten "Take the quest" buttons to get there by keyboard.
+ *
+ * One row in both states, so the panel does not resize when the board changes underneath it. It is
+ * never disabled on the grounds that waiting looks unwise; when the strategy would also wait it
+ * says so and leaves the decision alone.
  */
 defineProps<{
   recommended: boolean
@@ -20,17 +25,13 @@ const emit = defineEmits<{ wait: [] }>()
 
 <template>
   <section class="wait" :class="{ 'wait--urged': recommended }" aria-labelledby="wait-heading">
-    <div class="wait__text">
-      <h2 id="wait-heading" class="wait__heading">Let the turn pass</h2>
-      <p class="wait__body">
-        <template v-if="recommended">
-          Nothing on the board is worth the risk right now. Waiting costs a turn and nothing else.
-        </template>
-        <template v-else>
-          Costs a turn, risks nothing. Notices expire and new ones arrive either way.
-        </template>
-      </p>
-    </div>
+    <p class="wait__copy">
+      <span id="wait-heading" class="wait__heading">Let the turn pass</span>
+      <span class="wait__body">
+        <template v-if="recommended">Nothing here is worth the risk.</template>
+        <template v-else>Costs a turn, risks nothing.</template>
+      </span>
+    </p>
 
     <button
       type="button"
@@ -51,7 +52,7 @@ const emit = defineEmits<{ wait: [] }>()
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--gap-2) var(--gap-3);
+  gap: var(--gap-2);
   padding: var(--gap-2) var(--gap-3);
   border: 1px dashed var(--rule-strong);
   border-radius: var(--radius);
@@ -64,30 +65,45 @@ const emit = defineEmits<{ wait: [] }>()
   background: var(--wax-wash);
 }
 
+.wait__copy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--gap-2);
+  margin: 0;
+  min-width: 0;
+}
+
 .wait__heading {
   font-family: var(--display);
   font-size: var(--step-1);
-  margin: 0;
 }
 
 .wait__body {
-  margin: 0.15rem 0 0;
   font-size: 0.8125rem;
   color: var(--ink-soft);
-  max-width: 34rem;
 }
 
 .wait--urged .wait__body {
-  color: var(--ink);
+  color: var(--wax);
+  font-weight: 600;
 }
 
 .wait__action {
   flex: none;
+  min-height: 2.5rem;
+  padding: 0.45rem 1.1rem;
+  font-size: var(--step-0);
 }
 
 @media (max-width: 30rem) {
+  .wait {
+    gap: var(--gap-2);
+  }
+
   .wait__action {
     width: 100%;
+    min-height: 2.75rem;
   }
 }
 </style>

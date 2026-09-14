@@ -45,20 +45,21 @@ const nothingWorthAttempting = computed(
       <div class="game__main">
         <TurnResult v-if="!isAuto && lastEvent && lastEvent.action !== 'STARTED'" :event="lastEvent" />
 
-        <AdBoard
-          :ads="run.ads"
-          :actionable="!isAuto"
-          :pending-ad-id="pendingAdId"
-          :busy="busy || !canAct"
-          @solve="emit('solve', $event)"
-        />
-
+        <!-- Above the board: this is the move you need when the board is the problem. -->
         <WaitTurnPanel
           v-if="!isAuto"
           :recommended="nothingWorthAttempting"
           :pending="busy && !pendingAdId && !pendingItemId"
           :disabled="busy || !canAct"
           @wait="emit('wait')"
+        />
+
+        <AdBoard
+          :ads="run.ads"
+          :actionable="!isAuto"
+          :pending-ad-id="pendingAdId"
+          :busy="busy || !canAct"
+          @solve="emit('solve', $event)"
         />
       </div>
 

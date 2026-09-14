@@ -18,7 +18,17 @@ describe('WaitTurnPanel', () => {
   })
 
   it('says so when the strategy would also wait', () => {
-    expect(mountPanel({ recommended: true }).text()).toContain('Nothing on the board is worth the risk')
+    expect(mountPanel({ recommended: true }).text()).toContain('Nothing here is worth the risk')
+  })
+
+  it('keeps to one row in both states so it does not resize as the board changes', () => {
+    // The panel sits above the board now. If it grew a line when the last viable quest expired,
+    // the whole board would jump down at exactly the wrong moment.
+    const quiet = mountPanel({ recommended: false })
+    const urged = mountPanel({ recommended: true })
+
+    expect(quiet.findAll('p')).toHaveLength(1)
+    expect(urged.findAll('p')).toHaveLength(1)
   })
 
   it('stays available even when the strategy would not wait', () => {
