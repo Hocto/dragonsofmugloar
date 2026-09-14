@@ -17,4 +17,13 @@ public record GameState(
     public GameState withLives(int newLives) {
         return new GameState(gameId, newLives, gold, level, score, highScore, turn);
     }
+
+    /**
+     * Not every call that costs a turn reports the new state back - the reputation endpoint returns
+     * three numbers and nothing else - so the counter has to be advanced here or it silently drifts
+     * behind what Mugloar thinks the turn is.
+     */
+    public GameState advanceTurn() {
+        return new GameState(gameId, lives, gold, level, score, highScore, turn + 1);
+    }
 }

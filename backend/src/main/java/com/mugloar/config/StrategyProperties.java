@@ -10,8 +10,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param urgencyWeight            how hard to favour ads that are about to expire
  * @param healingThresholdLives    buy a potion at or below this many lives
  * @param upgradeGoldReserve       gold held back after an upgrade when the shop has no potion
- * @param investigateReputationEveryTurns
- *        0 disables it. Investigating costs a turn, which is the whole problem - see the README.
+ * @param maxIdleTurns
+ *        how many turns a run may give up waiting for a survivable board. 0 disables waiting.
  */
 @ConfigurationProperties(prefix = "mugloar.strategy")
 public record StrategyProperties(
@@ -19,5 +19,5 @@ public record StrategyProperties(
         double urgencyWeight,
         int healingThresholdLives,
         int upgradeGoldReserve,
-        int investigateReputationEveryTurns) {
+        int maxIdleTurns) {
 }

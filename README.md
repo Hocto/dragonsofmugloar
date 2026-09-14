@@ -100,12 +100,23 @@ upgrade whenever there is surplus, because every upgrade raises the level by one
 price — 100 gold buys the same progress as 300, which I checked. Then nothing, because buying costs
 a turn even when the purchase fails.
 
-Reputation I tracked and then switched off. `POST /:gameId/investigate/reputation` costs a turn — I
-confirmed it by watching an ad's `expiresIn` tick down across the call — and a turn is worth
-somewhere north of 100 gold once the dragon is levelled. Nothing in the strategy reads the three
-numbers it returns. Paying a turn for information you do not act on is a bad trade, so
-`investigate-reputation-every-turns` defaults to 0. Set it and the run records reputation and the UI
-shows it. That is an honest "no", not a missing feature.
+There is one more move, and I had it in front of me for a while before I saw it. Early on I measured
+that `POST /:gameId/investigate/reputation` costs a turn — I watched an ad's `expiresIn` tick down
+across the call — and wrote it off: paying a turn for three numbers the strategy never reads is a
+bad trade, so I left it switched off.
+
+That was the wrong way round. The turn cost is not the price of the feature, it *is* the feature.
+This API has no way to pass, but a turn can still be given up, and reputation is a call that spends
+one and risks nothing. So when the whole board sits below the survival floor and there is no gold
+for a potion, the bot now waits instead of gambling. A lost life ends the run and everything it
+would still have earned; a lost turn costs one turn. The board moves on regardless, because expiry
+ticks down and new ads appear, so waiting is genuinely a way to be dealt a different hand.
+
+It is budgeted at ten turns per run rather than unlimited, for the same reason the shop policy buys
+upgrades: once a dragon is levelled a turn is worth a couple of hundred gold, and a run that waits
+forever on a board that never improves has only found a slower way to score nothing. Past the
+budget it goes back to taking the least bad ad on the board. Reputation is now read only while
+waiting, which is also how the UI comes to have it.
 
 ## What the numbers actually look like
 

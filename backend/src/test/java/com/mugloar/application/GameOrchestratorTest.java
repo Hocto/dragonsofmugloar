@@ -9,6 +9,7 @@ import com.mugloar.FakeMugloarApi;
 import com.mugloar.application.port.MugloarApiException;
 import com.mugloar.application.strategy.ExpectedValueStrategy;
 import com.mugloar.domain.GameState;
+import com.mugloar.domain.Reputation;
 import com.mugloar.domain.RiskLevel;
 import com.mugloar.domain.ShopItem;
 import java.util.List;
@@ -27,7 +28,12 @@ class GameOrchestratorTest {
             new ShopItem("cs", "Claw Sharpening", 100));
 
     private GameOrchestrator orchestratorFor(FakeMugloarApi api) {
-        return new GameOrchestrator(api, new ExpectedValueStrategy(1.6), new ShopPolicy(2, 50));
+        return orchestratorFor(api, 20);
+    }
+
+    private GameOrchestrator orchestratorFor(FakeMugloarApi api, int maxIdleTurns) {
+        return new GameOrchestrator(
+                api, new ExpectedValueStrategy(1.6), new ShopPolicy(2, 50), maxIdleTurns);
     }
 
     @Test
@@ -104,21 +110,111 @@ class GameOrchestratorTest {
     }
 
     @Test
-    void takesTheSafestAdWhenTheStrategyRefusesEverything() {
-        // One life, no gold for a potion, and nothing on the board clears the survival floor.
-        // There is no way to skip a turn, so the least bad option is still the right move.
+    void waitsOutTheTurnRatherThanGamblingItsLastLife() {
+        // One life, no gold for a potion, nothing on the board above the survival floor. Giving up
+        // the turn costs a turn; attempting anything here costs the run about half the time.
         FakeMugloarApi api = new FakeMugloarApi(
                 List.of(
                         ad("awful", 300, 3, RiskLevel.SUICIDE_MISSION),
-                        ad("bad", 200, 3, RiskLevel.RISKY),
+                        ad("bad", 200, 3, RiskLevel.RISKY)),
+                SHOP);
+
+        TurnEvent event = orchestratorFor(api).playTurn(state(1, 0, 0), 1);
+
+        assertThat(event.action()).isEqualTo(TurnAction.IDLED);
+        assertThat(api.calls()).contains("investigateReputation");
+        assertThat(api.calls()).noneMatch(call -> call.startsWith("solve:"));
+    }
+
+    @Test
+    void waitingSpendsATurnAndNothingElse() {
+        FakeMugloarApi api = new FakeMugloarApi(List.of(ad("bad", 200, 3, RiskLevel.RISKY)), SHOP);
+
+        TurnEvent event = orchestratorFor(api).playTurn(state(1, 40, 3), 1);
+
+        // The reputation endpoint reports no state, so the turn has to be advanced locally.
+        assertThat(event.delta().turn()).isEqualTo(1);
+        assertThat(event.delta().lives()).isZero();
+        assertThat(event.delta().gold()).isZero();
+        assertThat(event.state().turn()).isEqualTo(state(1, 40, 3).turn() + 1);
+        assertThat(event.state().level()).isEqualTo(3);
+    }
+
+    @Test
+    void takesTheSafestAdOnceTheWaitingBudgetIsSpent() {
+        FakeMugloarApi api = new FakeMugloarApi(
+                List.of(
+                        ad("awful", 300, 3, RiskLevel.SUICIDE_MISSION),
                         ad("less-bad", 30, 3, RiskLevel.SURE_THING)),
                 SHOP)
+                .solvesWillGo(true);
+        GameOrchestrator orchestrator = orchestratorFor(api, 2);
+
+        GameState current = state(1, 0, 0);
+        assertThat(orchestrator.playTurn(current, 1).action()).isEqualTo(TurnAction.IDLED);
+        assertThat(orchestrator.playTurn(current, 2).action()).isEqualTo(TurnAction.IDLED);
+
+        // Budget gone. Waiting forever on a board that never improves scores nothing either.
+        TurnEvent third = orchestrator.playTurn(current, 3);
+        assertThat(third.action()).isEqualTo(TurnAction.SOLVED);
+        assertThat(third.target()).isEqualTo("less-bad");
+    }
+
+    @Test
+    void neverWaitsWhenWaitingIsTurnedOff() {
+        FakeMugloarApi api = new FakeMugloarApi(
+                List.of(ad("less-bad", 30, 3, RiskLevel.SURE_THING),
+                        ad("awful", 300, 3, RiskLevel.SUICIDE_MISSION)),
+                SHOP)
+                .solvesWillGo(true);
+
+        TurnEvent event = orchestratorFor(api, 0).playTurn(state(1, 0, 0), 1);
+
+        assertThat(event.action()).isEqualTo(TurnAction.SOLVED);
+        assertThat(api.calls()).doesNotContain("investigateReputation");
+    }
+
+    @Test
+    void doesNotWaitWhenThereIsSomethingWorthAttempting() {
+        FakeMugloarApi api = new FakeMugloarApi(List.of(ad("safe", 40, 5, RiskLevel.PIECE_OF_CAKE)), SHOP)
                 .solvesWillGo(true);
 
         TurnEvent event = orchestratorFor(api).playTurn(state(1, 0, 0), 1);
 
         assertThat(event.action()).isEqualTo(TurnAction.SOLVED);
-        assertThat(event.target()).isEqualTo("less-bad");
+        assertThat(api.calls()).doesNotContain("investigateReputation");
+    }
+
+    @Test
+    void prefersBuyingAPotionOverWaiting() {
+        // Waiting buys a turn; a potion buys a life. The shop policy runs first for that reason.
+        FakeMugloarApi api = new FakeMugloarApi(List.of(ad("bad", 200, 3, RiskLevel.RISKY)), SHOP);
+
+        TurnEvent event = orchestratorFor(api).playTurn(state(1, 80, 0), 1);
+
+        assertThat(event.action()).isEqualTo(TurnAction.BOUGHT);
+        assertThat(event.target()).isEqualTo("hpot");
+        assertThat(api.calls()).doesNotContain("investigateReputation");
+    }
+
+    @Test
+    void remembersTheReputationItReadWhileWaiting() {
+        FakeMugloarApi api = new FakeMugloarApi(List.of(ad("bad", 200, 3, RiskLevel.RISKY)), SHOP);
+        GameOrchestrator orchestrator = orchestratorFor(api);
+        GameState current = state(1, 0, 0);
+
+        assertThat(orchestrator.reputationFor(current.gameId())).isEmpty();
+        orchestrator.playTurn(current, 1);
+
+        assertThat(orchestrator.reputationFor(current.gameId())).contains(Reputation.NEUTRAL);
+    }
+
+    @Test
+    void waitsRatherThanFailingWhenTheBoardIsEmpty() {
+        FakeMugloarApi api = new FakeMugloarApi(List.of(), SHOP);
+
+        assertThat(orchestratorFor(api).playTurn(state(3, 0, 0), 1).action())
+                .isEqualTo(TurnAction.IDLED);
     }
 
     @Test
@@ -140,10 +236,10 @@ class GameOrchestratorTest {
     }
 
     @Test
-    void reportsAnEmptyBoardRatherThanThrowing() {
+    void reportsAnEmptyBoardRatherThanThrowingOnceItCannotEvenWait() {
         FakeMugloarApi api = new FakeMugloarApi(List.of(), SHOP);
 
-        TurnEvent event = orchestratorFor(api).playTurn(state(3, 0, 0), 1);
+        TurnEvent event = orchestratorFor(api, 0).playTurn(state(3, 0, 0), 1);
 
         assertThat(event.action()).isEqualTo(TurnAction.FAILED);
         assertThat(event.description()).contains("empty");

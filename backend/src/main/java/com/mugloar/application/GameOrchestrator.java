@@ -6,6 +6,7 @@ import com.mugloar.domain.Ad;
 import com.mugloar.domain.AdValuation;
 import com.mugloar.domain.GameState;
 import com.mugloar.domain.PurchaseResult;
+import com.mugloar.domain.Reputation;
 import com.mugloar.domain.ShopItem;
 import com.mugloar.domain.SolveResult;
 import java.util.Comparator;
@@ -38,17 +39,38 @@ public final class GameOrchestrator {
      * evicted oldest-first by insertion order, which is close enough for a listing that is
      * identical everywhere anyway.
      */
-    private static final int SHOP_CACHE_LIMIT = 500;
+    private static final int MEMORY_LIMIT = 500;
 
     private final MugloarApi api;
     private final AdSelectionStrategy strategy;
     private final ShopPolicy shopPolicy;
-    private final Map<String, List<ShopItem>> shopByGame = new ConcurrentHashMap<>();
+    private final int maxIdleTurns;
+    private final Map<String, GameMemory> memoryByGame = new ConcurrentHashMap<>();
 
-    public GameOrchestrator(MugloarApi api, AdSelectionStrategy strategy, ShopPolicy shopPolicy) {
+    /**
+     * What the orchestrator remembers between turns of one game: the shop listing, which never
+     * changes; how much of the waiting budget has been spent; and the last reputation reading,
+     * which only exists because waiting is what fetches it.
+     */
+    private record GameMemory(List<ShopItem> shop, int idlesUsed, Reputation reputation) {
+
+        static final GameMemory EMPTY = new GameMemory(null, 0, null);
+
+        GameMemory withShop(List<ShopItem> listing) {
+            return new GameMemory(listing, idlesUsed, reputation);
+        }
+
+        GameMemory afterIdling(Reputation latest) {
+            return new GameMemory(shop, idlesUsed + 1, latest);
+        }
+    }
+
+    public GameOrchestrator(
+            MugloarApi api, AdSelectionStrategy strategy, ShopPolicy shopPolicy, int maxIdleTurns) {
         this.api = api;
         this.strategy = strategy;
         this.shopPolicy = shopPolicy;
+        this.maxIdleTurns = maxIdleTurns;
     }
 
     public String strategyName() {
@@ -69,21 +91,27 @@ public final class GameOrchestrator {
     }
 
     private List<ShopItem> shopFor(String gameId) {
-        List<ShopItem> cached = shopByGame.get(gameId);
-        if (cached != null) {
-            return cached;
+        GameMemory memory = memoryByGame.get(gameId);
+        if (memory != null && memory.shop() != null) {
+            return memory.shop();
         }
-        if (shopByGame.size() >= SHOP_CACHE_LIMIT) {
-            shopByGame.keySet().stream().findFirst().ifPresent(shopByGame::remove);
+        if (memoryByGame.size() >= MEMORY_LIMIT) {
+            memoryByGame.keySet().stream().findFirst().ifPresent(memoryByGame::remove);
         }
         List<ShopItem> fetched = api.shop(gameId);
-        shopByGame.put(gameId, fetched);
+        memoryByGame.merge(gameId, GameMemory.EMPTY.withShop(fetched),
+                (existing, fresh) -> existing.withShop(fetched));
         return fetched;
     }
 
-    /** Called when a run ends so a long-running server does not hold shop listings forever. */
+    /** The last reputation read while waiting out a bad board, if the game has ever had to. */
+    public Optional<Reputation> reputationFor(String gameId) {
+        return Optional.ofNullable(memoryByGame.get(gameId)).map(GameMemory::reputation);
+    }
+
+    /** Called when a run ends so a long-running server does not hold this forever. */
     public void forget(String gameId) {
-        shopByGame.remove(gameId);
+        memoryByGame.remove(gameId);
     }
 
     /** Fetches a board and plays a turn from it. The benchmark's entry point. */
@@ -110,12 +138,60 @@ public final class GameOrchestrator {
             return buy(state, buy, sequence);
         }
 
-        Optional<AdValuation> choice = board.ranked().stream().findFirst()
-                .or(() -> lastResort(board.ads(), state));
-        if (choice.isEmpty()) {
-            return TurnEvent.failed(sequence, state, "Message board was empty");
+        Optional<AdValuation> choice = board.ranked().stream().findFirst();
+        if (choice.isPresent()) {
+            return solve(state, choice.get(), sequence);
         }
-        return solve(state, choice.get(), sequence);
+
+        // Nothing on the board clears the survival floor, and the shop policy has already decided
+        // it cannot fix that with a potion. Waiting is the remaining move.
+        if (idlingIsAvailable(state.gameId())) {
+            return idle(state, sequence);
+        }
+
+        return lastResort(board.ads(), state)
+                .map(fallback -> solve(state, fallback, sequence))
+                .orElseGet(() -> TurnEvent.failed(sequence, state, "Message board was empty"));
+    }
+
+    /**
+     * Spends the turn without attempting anything.
+     *
+     * <p>There is no "pass" in this API, but a turn can still be given up: asking for the player's
+     * reputation costs one and risks nothing. When the whole board is below the survival floor and
+     * there is no gold for a potion, that is a better trade than a coin flip - a lost life ends the
+     * run and everything it would still have earned, while a lost turn costs one turn. The board
+     * moves on either way, because expiry ticks down and new ads appear.
+     *
+     * <p>It is budgeted rather than unlimited. A run that waits forever on a board that never
+     * improves has simply found a slower way to score nothing.
+     */
+    private TurnEvent idle(GameState before, long sequence) {
+        Reputation reputation = api.investigateReputation(before.gameId());
+        GameMemory memory = memoryByGame
+                .merge(before.gameId(), GameMemory.EMPTY.afterIdling(reputation),
+                        (existing, fresh) -> existing.afterIdling(reputation));
+
+        // The reputation call reports no state of its own, so the turn is advanced here.
+        GameState after = before.advanceTurn();
+        String why = "Nothing worth attempting at %d %s - waited a turn (people %.1f, state %.1f, "
+                .formatted(before.lives(), before.lives() == 1 ? "life" : "lives",
+                        reputation.people(), reputation.state())
+                + "underworld %.1f)".formatted(reputation.underworld());
+
+        log.info("turn.idle gameId={} turn={} lives={} gold={} idlesUsed={}/{} reputation={}",
+                after.gameId(), after.turn(), after.lives(), after.gold(),
+                memory.idlesUsed(), maxIdleTurns, reputation);
+
+        return TurnEvent.idled(sequence, why, before, after);
+    }
+
+    private boolean idlingIsAvailable(String gameId) {
+        if (maxIdleTurns <= 0) {
+            return false;
+        }
+        GameMemory memory = memoryByGame.get(gameId);
+        return memory == null || memory.idlesUsed() < maxIdleTurns;
     }
 
     /** Manual mode: the human picked an ad, so no strategy filtering applies. */

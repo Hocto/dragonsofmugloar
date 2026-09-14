@@ -17,6 +17,8 @@ function headline(event: TurnEvent): string {
     case 'BOUGHT':
       // The detail line below carries the item name and the reason, so the headline stays short.
       return event.success ? 'Went shopping.' : 'Could not afford it.'
+    case 'IDLED':
+      return 'Waited out the turn.'
     case 'FINISHED':
       return 'The run is over.'
     case 'FAILED':
@@ -65,7 +67,10 @@ function deltaParts(event: TurnEvent): string[] {
         <div class="feed__body">
           <p class="feed__headline">{{ headline(event) }}</p>
           <p v-if="event.action === 'SOLVED'" class="feed__detail">{{ event.description }}</p>
-          <p v-else-if="event.action === 'BOUGHT'" class="feed__detail">{{ event.description }}</p>
+          <p
+            v-else-if="event.action === 'BOUGHT' || event.action === 'IDLED'"
+            class="feed__detail"
+          >{{ event.description }}</p>
           <p class="feed__meta">
             <span v-if="event.risk" class="numeral">
               {{ event.risk }}<template v-if="event.successChance">

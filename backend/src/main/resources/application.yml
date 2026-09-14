@@ -38,9 +38,11 @@ mugloar:
     urgency-weight: 1.6
     healing-threshold-lives: 2
     upgrade-gold-reserve: 50
-    # Investigating costs a turn and nothing in the strategy reads the answer, so it is off by
-    # default. Set it to e.g. 15 to sample reputation during a run and see it in the UI.
-    investigate-reputation-every-turns: 0
+    # When the whole board is below the survival floor and there is no gold for a potion, a run may
+    # give up the turn instead of gambling a life. Budgeted, because waiting forever on a board that
+    # never improves is just a slower way to score nothing - and by the time a dragon is levelled a
+    # turn is worth a couple of hundred gold, so the budget is deliberately small. 0 turns it off.
+    max-idle-turns: 10
 
   benchmark:
     games: 100

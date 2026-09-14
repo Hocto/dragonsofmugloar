@@ -8,7 +8,7 @@
 
 export type RunMode = 'AUTO' | 'MANUAL'
 export type RunStatus = 'RUNNING' | 'FINISHED' | 'FAILED'
-export type TurnAction = 'STARTED' | 'SOLVED' | 'BOUGHT' | 'FINISHED' | 'FAILED'
+export type TurnAction = 'STARTED' | 'SOLVED' | 'BOUGHT' | 'IDLED' | 'FINISHED' | 'FAILED'
 export type AdEncoding = 'NONE' | 'BASE64' | 'ROT13'
 
 export interface GameState {

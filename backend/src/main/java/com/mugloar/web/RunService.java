@@ -4,9 +4,7 @@ import com.mugloar.application.Board;
 import com.mugloar.application.GameOrchestrator;
 import com.mugloar.application.ShopDecision;
 import com.mugloar.application.TurnEvent;
-import com.mugloar.application.port.MugloarApi;
 import com.mugloar.application.port.MugloarApiException;
-import com.mugloar.config.StrategyProperties;
 import com.mugloar.domain.GameState;
 import com.mugloar.web.dto.RunView;
 import com.mugloar.web.dto.TurnResultView;
@@ -35,26 +33,20 @@ public class RunService {
             new Board(List.of(), List.of(), List.of(), new ShopDecision.Skip("Run is over"));
 
     private final GameOrchestrator orchestrator;
-    private final MugloarApi api;
     private final RunRegistry registry;
     private final RunViewMapper mapper;
     private final Duration autoTurnDelay;
-    private final int investigateEveryTurns;
     private final ExecutorService runners = Executors.newVirtualThreadPerTaskExecutor();
 
     public RunService(
             GameOrchestrator orchestrator,
-            MugloarApi api,
             RunRegistry registry,
             RunViewMapper mapper,
-            WebProperties webProperties,
-            StrategyProperties strategyProperties) {
+            WebProperties webProperties) {
         this.orchestrator = orchestrator;
-        this.api = api;
         this.registry = registry;
         this.mapper = mapper;
         this.autoTurnDelay = webProperties.autoTurnDelay();
-        this.investigateEveryTurns = strategyProperties.investigateReputationEveryTurns();
     }
 
     public RunView start(RunMode mode) {
@@ -105,6 +97,7 @@ public class RunService {
 
     private TurnResultView afterManualTurn(Run run, TurnEvent event) {
         run.record(event);
+        orchestrator.reputationFor(run.id()).ifPresent(run::reputation);
         finishIfDead(run);
         run.board(run.isRunning() ? orchestrator.board(run.state()) : null);
         return new TurnResultView(event, view(run));
@@ -148,7 +141,9 @@ public class RunService {
                 Board board = orchestrator.board(run.state());
                 run.board(board);
                 run.record(orchestrator.playTurn(run.state(), board, run.nextSequence()));
-                investigateIfDue(run);
+                // Reputation is only ever read while waiting out a bad board, so this picks it up
+                // whenever that has happened and leaves it null otherwise.
+                orchestrator.reputationFor(run.id()).ifPresent(run::reputation);
                 pause();
             }
             if (run.isRunning()) {
@@ -166,19 +161,6 @@ public class RunService {
             orchestrator.forget(run.id());
             run.board(null);
         }
-    }
-
-    /**
-     * Reputation is informational only, and asking for it burns a turn, so it is off unless
-     * explicitly configured. See the README for what the measurement said.
-     */
-    private void investigateIfDue(Run run) {
-        int turn = run.state().turn();
-        if (investigateEveryTurns <= 0 || turn == 0 || turn % investigateEveryTurns != 0) {
-            return;
-        }
-        run.reputation(api.investigateReputation(run.id()));
-        log.info("run.reputation gameId={} turn={} value={}", run.id(), run.state().turn(), run.reputation());
     }
 
     private void finishIfDead(Run run) {

@@ -43,7 +43,10 @@ public class StrategyConfiguration {
 
     @Bean
     GameOrchestrator gameOrchestrator(
-            MugloarApi api, AdSelectionStrategy strategy, ShopPolicy shopPolicy) {
-        return new GameOrchestrator(api, strategy, shopPolicy);
+            MugloarApi api,
+            AdSelectionStrategy strategy,
+            ShopPolicy shopPolicy,
+            StrategyProperties properties) {
+        return new GameOrchestrator(api, strategy, shopPolicy, properties.maxIdleTurns());
     }
 }

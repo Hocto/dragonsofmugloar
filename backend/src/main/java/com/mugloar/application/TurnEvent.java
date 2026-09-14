@@ -60,6 +60,11 @@ public record TurnEvent(
                 Instant.now());
     }
 
+    public static TurnEvent idled(long sequence, String why, GameState before, GameState after) {
+        return new TurnEvent(sequence, TurnAction.IDLED, before.gameId(), why, true,
+                null, null, null, null, after, StateDelta.between(before, after), Instant.now());
+    }
+
     public static TurnEvent bought(
             long sequence, ShopDecision.Buy buy, boolean success, GameState before, GameState after) {
         return new TurnEvent(
