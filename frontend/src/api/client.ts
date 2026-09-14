@@ -78,6 +78,11 @@ export function buyItem(runId: string, itemId: string): Promise<TurnResultView> 
   })
 }
 
+/** Give up the turn. No body: there is nothing to choose, which is the point of the move. */
+export function waitOutTurn(runId: string): Promise<TurnResultView> {
+  return request<TurnResultView>(`${BASE}/${encodeURIComponent(runId)}/wait`, { method: 'POST' })
+}
+
 /** The SSE endpoint. Subscribing is the composable's job; this just names the URL. */
 export function streamUrl(runId: string): string {
   return `${BASE}/${encodeURIComponent(runId)}/stream`

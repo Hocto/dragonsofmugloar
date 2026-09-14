@@ -159,6 +159,29 @@ class RunControllerTest {
     }
 
     @Test
+    void waitingOutATurnNeedsNoBodyAndReturnsTheDelta() throws Exception {
+        given(runs.waitOutTurn("g1")).willReturn(new TurnResultView(
+                TurnEvent.idled(4, "Nothing worth attempting", state(), state()), sampleView()));
+
+        mvc.perform(post("/api/runs/g1/wait"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.event.action").value("IDLED"))
+                .andExpect(jsonPath("$.run.runId").value("g1"));
+
+        verify(runs).waitOutTurn("g1");
+    }
+
+    @Test
+    void waitingOutATurnOnAnAutoRunIsAConflict() throws Exception {
+        willThrow(new IllegalStateException("Run g1 is playing itself; watch the stream instead"))
+                .given(runs).waitOutTurn(any());
+
+        mvc.perform(post("/api/runs/g1/wait"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("BAD_STATE"));
+    }
+
+    @Test
     void manualActionsOnAnAutoRunAreAConflictNotACrash() throws Exception {
         willThrow(new IllegalStateException("Run g1 is playing itself; watch the stream instead"))
                 .given(runs).solve(any(), any());

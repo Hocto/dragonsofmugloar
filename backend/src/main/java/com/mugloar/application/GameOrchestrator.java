@@ -146,7 +146,8 @@ public final class GameOrchestrator {
         // Nothing on the board clears the survival floor, and the shop policy has already decided
         // it cannot fix that with a potion. Waiting is the remaining move.
         if (idlingIsAvailable(state.gameId())) {
-            return idle(state, sequence);
+            return idle(state, sequence, "Nothing worth attempting at %d %s"
+                    .formatted(state.lives(), state.lives() == 1 ? "life" : "lives"));
         }
 
         return lastResort(board.ads(), state)
@@ -166,7 +167,7 @@ public final class GameOrchestrator {
      * <p>It is budgeted rather than unlimited. A run that waits forever on a board that never
      * improves has simply found a slower way to score nothing.
      */
-    private TurnEvent idle(GameState before, long sequence) {
+    private TurnEvent idle(GameState before, long sequence, String reason) {
         Reputation reputation = api.investigateReputation(before.gameId());
         GameMemory memory = memoryByGame
                 .merge(before.gameId(), GameMemory.EMPTY.afterIdling(reputation),
@@ -174,10 +175,9 @@ public final class GameOrchestrator {
 
         // The reputation call reports no state of its own, so the turn is advanced here.
         GameState after = before.advanceTurn();
-        String why = "Nothing worth attempting at %d %s - waited a turn (people %.1f, state %.1f, "
-                .formatted(before.lives(), before.lives() == 1 ? "life" : "lives",
-                        reputation.people(), reputation.state())
-                + "underworld %.1f)".formatted(reputation.underworld());
+        // The reason differs by who decided: the strategy explains itself, a person does not have to.
+        String why = "%s - waited a turn (people %.1f, state %.1f, underworld %.1f)".formatted(
+                reason, reputation.people(), reputation.state(), reputation.underworld());
 
         log.info("turn.idle gameId={} turn={} lives={} gold={} idlesUsed={}/{} reputation={}",
                 after.gameId(), after.turn(), after.lives(), after.gold(),
@@ -201,6 +201,16 @@ public final class GameOrchestrator {
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("No such ad on the board: " + adId));
         return solve(state, valuate(ad), sequence);
+    }
+
+    /**
+     * Manual mode: the human chose to give up the turn rather than attempt anything.
+     *
+     * <p>Deliberately not subject to the waiting budget. The budget exists to stop an automatic run
+     * looping on a board that never improves; a person clicking the button has already decided.
+     */
+    public TurnEvent waitOutTurn(GameState state, long sequence) {
+        return idle(state, sequence, "Let the turn pass");
     }
 
     /** Manual mode: the human picked an item. */

@@ -160,6 +160,29 @@ export const useRunStore = defineStore('run', () => {
   }
 
   /**
+   * Give up the turn. Same phase as a solve, because it is the same kind of move: one turn spent,
+   * board comes back changed.
+   */
+  async function waitOutTurn(): Promise<void> {
+    const current = run.value
+    if (!current || phase.value !== 'playing') return
+    phase.value = 'resolving'
+    await attempt(
+      () => api.waitOutTurn(current.runId),
+      (result) => {
+        run.value = result.run
+        lastEvent.value = result.event
+        feed.value = [result.event, ...feed.value]
+      },
+      waitOutTurn,
+      'playing',
+    )
+    if (run.value) {
+      phase.value = syncPhase()
+    }
+  }
+
+  /**
    * A turn arrived on the stream. Auto runs are driven entirely by this: the server is the source
    * of truth for state, and the client only appends.
    */
@@ -226,6 +249,7 @@ export const useRunStore = defineStore('run', () => {
     refresh,
     solve,
     buy,
+    waitOutTurn,
     reset,
     applyStreamedTurn,
     refreshBoardQuietly,

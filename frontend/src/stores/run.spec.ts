@@ -63,6 +63,31 @@ describe('run store', () => {
     expect(store.pendingItemId).toBeNull()
   })
 
+  it('spends a turn and no lives when the player lets the turn pass', async () => {
+    const store = useRunStore()
+    await store.start('MANUAL')
+
+    const pending = store.waitOutTurn()
+    expect(store.phase).toBe('resolving')
+    await pending
+
+    expect(store.phase).toBe('playing')
+    expect(store.lastEvent?.action).toBe('IDLED')
+    expect(store.lastEvent?.delta.turn).toBe(1)
+    expect(store.lastEvent?.delta.lives).toBe(0)
+    expect(store.feed).toHaveLength(1)
+  })
+
+  it('will not let the turn pass when it is not the player\'s move', async () => {
+    const store = useRunStore()
+    await store.start('AUTO')
+    store.phase = 'gameOver'
+
+    await store.waitOutTurn()
+
+    expect(store.feed).toHaveLength(0)
+  })
+
   it('will not act while another action is in flight', async () => {
     const store = useRunStore()
     await store.start('MANUAL')

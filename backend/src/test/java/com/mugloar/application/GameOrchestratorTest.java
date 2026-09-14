@@ -124,6 +124,7 @@ class GameOrchestratorTest {
         assertThat(event.action()).isEqualTo(TurnAction.IDLED);
         assertThat(api.calls()).contains("investigateReputation");
         assertThat(api.calls()).noneMatch(call -> call.startsWith("solve:"));
+        assertThat(event.description()).startsWith("Nothing worth attempting at 1 life");
     }
 
     @Test
@@ -281,6 +282,24 @@ class GameOrchestratorTest {
         assertThat(event.target()).isEqualTo("reckless");
         assertThat(event.success()).isFalse();
         assertThat(event.delta().lives()).isEqualTo(-1);
+    }
+
+    @Test
+    void aPersonCanGiveUpTheTurnEvenWithTheBotsBudgetSpent() {
+        // The budget stops an automatic run looping. Someone clicking the button has decided.
+        FakeMugloarApi api = new FakeMugloarApi(List.of(ad("bad", 200, 3, RiskLevel.RISKY)), SHOP);
+        GameOrchestrator orchestrator = orchestratorFor(api, 0);
+        GameState current = state(1, 0, 0);
+
+        TurnEvent event = orchestrator.waitOutTurn(current, 1);
+
+        assertThat(event.action()).isEqualTo(TurnAction.IDLED);
+        assertThat(event.delta().turn()).isEqualTo(1);
+        assertThat(event.delta().lives()).isZero();
+        assertThat(api.calls()).contains("investigateReputation");
+        // A person's own choice is not explained back to them as the bot's reasoning.
+        assertThat(event.description()).startsWith("Let the turn pass");
+        assertThat(event.description()).doesNotContain("Nothing worth attempting");
     }
 
     @Test

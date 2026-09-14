@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import StatusBar from './StatusBar.vue'
 import AdBoard from './AdBoard.vue'
 import ShopPanel from './ShopPanel.vue'
+import WaitTurnPanel from './WaitTurnPanel.vue'
 import TurnFeed from './TurnFeed.vue'
 import TurnResult from './TurnResult.vue'
 import type { RunView, TurnEvent } from '@/api/types'
@@ -18,9 +19,17 @@ const props = defineProps<{
   streamConnected: boolean
 }>()
 
-const emit = defineEmits<{ solve: [adId: string]; buy: [itemId: string] }>()
+const emit = defineEmits<{ solve: [adId: string]; buy: [itemId: string]; wait: [] }>()
 
 const isAuto = computed(() => props.run.mode === 'AUTO')
+
+/**
+ * The strategy has refused every notice on the board, which is exactly when it waits. Derived here
+ * rather than sent as its own field - the board already carries the per-ad verdict.
+ */
+const nothingWorthAttempting = computed(
+  () => props.run.ads.length > 0 && props.run.ads.every((ad) => ad.skippedByStrategy),
+)
 </script>
 
 <template>
@@ -42,6 +51,14 @@ const isAuto = computed(() => props.run.mode === 'AUTO')
           :pending-ad-id="pendingAdId"
           :busy="busy || !canAct"
           @solve="emit('solve', $event)"
+        />
+
+        <WaitTurnPanel
+          v-if="!isAuto"
+          :recommended="nothingWorthAttempting"
+          :pending="busy && !pendingAdId && !pendingItemId"
+          :disabled="busy || !canAct"
+          @wait="emit('wait')"
         />
       </div>
 

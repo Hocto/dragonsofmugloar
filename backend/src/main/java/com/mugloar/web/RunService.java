@@ -91,6 +91,15 @@ public class RunService {
         }
     }
 
+    /** The same move the strategy makes when the board is hopeless, available to a person too. */
+    public TurnResultView waitOutTurn(String runId) {
+        Run run = registry.require(runId);
+        synchronized (run) {
+            requireManualAndRunning(run);
+            return afterManualTurn(run, orchestrator.waitOutTurn(run.state(), run.nextSequence()));
+        }
+    }
+
     public Run require(String runId) {
         return registry.require(runId);
     }

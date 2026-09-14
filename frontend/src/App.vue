@@ -63,6 +63,7 @@ const showError = computed(() => store.error !== null)
       :stream-connected="connected"
       @solve="store.solve"
       @buy="store.buy"
+      @wait="store.waitOutTurn"
     />
 
     <GameOverScreen

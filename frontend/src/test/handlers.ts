@@ -21,6 +21,21 @@ export const handlers = [
     }),
   ),
 
+  http.post('/api/runs/:runId/wait', () =>
+    HttpResponse.json<TurnResultView>({
+      event: turnEvent({
+        action: 'IDLED',
+        target: null,
+        description: 'Nothing worth attempting at 1 life - waited a turn',
+        reward: null,
+        risk: null,
+        successChance: null,
+        delta: { lives: 0, gold: 0, score: 0, level: 0, turn: 1 },
+      }),
+      run: runView(),
+    }),
+  ),
+
   http.post('/api/runs/:runId/buy', () =>
     HttpResponse.json<TurnResultView>({
       event: turnEvent({ action: 'BOUGHT', target: 'hpot', description: 'Bought by hand' }),

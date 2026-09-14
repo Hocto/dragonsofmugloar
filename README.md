@@ -118,6 +118,13 @@ forever on a board that never improves has only found a slower way to score noth
 budget it goes back to taking the least bad ad on the board. Reputation is now read only while
 waiting, which is also how the UI comes to have it.
 
+The player gets the same move, on a `POST /api/runs/{id}/wait` that takes no body — there is nothing
+to choose, which is the point of it. That is a sixth endpoint beyond the five the brief lists, and I
+added it because manual mode promises the same board, the same shop and the same moves the bot has,
+and this is one of them. It is not gated on the strategy agreeing: the panel says when the bot would
+also wait and leaves the decision alone. The bot's budget does not apply either, since the budget
+exists to stop a loop and a person clicking a button has already decided.
+
 ## What the numbers actually look like
 
 Thirty runs of the tuned strategy, and fifteen of the naive one it was supposed to beat:

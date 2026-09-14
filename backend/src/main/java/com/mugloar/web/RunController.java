@@ -58,6 +58,17 @@ public class RunController {
         return runs.buy(runId, request.itemId());
     }
 
+    /**
+     * Give up the turn. No body: there is nothing to choose, which is the point of the move.
+     *
+     * <p>A sixth endpoint beyond the five the brief lists, added because manual mode promises the
+     * same moves the bot has and the bot can do this one.
+     */
+    @PostMapping("/{runId}/wait")
+    public TurnResultView waitOutTurn(@PathVariable String runId) {
+        return runs.waitOutTurn(runId);
+    }
+
     @GetMapping(value = "/{runId}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter stream(@PathVariable String runId) {
         return streams.subscribe(runs.require(runId));
