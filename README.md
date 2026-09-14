@@ -219,6 +219,11 @@ generic dark mode: the paper goes to soot and the ink to warm bone.
   The middle four labels are separated by a few percentage points on samples in the twenties and
   thirties, and I would not be surprised if a 5,000-attempt sample reordered them. The strategy is
   not very sensitive to that, but the numbers in `RiskLevel` are more confident than the data is.
+- **Waiting out a turn is reasoned, not measured.** The argument for it is sound on paper — a life
+  is worth more than a turn when the board is hopeless — and it is covered by tests, but I only got
+  three games through the benchmark before Mugloar's per-IP limit put me in minute-long backoffs,
+  and three games is not a result. Whether ten is the right budget, or whether it should scale with
+  dragon level now that a turn is worth a couple of hundred gold, is unanswered.
 - **The survival floor probably costs more than it saves.** It is the main thing separating the two
   strategies and the benchmark does not show it paying for itself. Relaxing it, or making it depend
   on how much gold is banked rather than only on lives, is the first experiment I would run.
