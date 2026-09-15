@@ -19,7 +19,7 @@ const props = defineProps<{
   streamConnected: boolean
 }>()
 
-const emit = defineEmits<{ solve: [adId: string]; buy: [itemId: string]; wait: [] }>()
+const emit = defineEmits<{ solve: [adId: string]; buy: [itemId: string]; wait: []; leave: [] }>()
 
 const isAuto = computed(() => props.run.mode === 'AUTO')
 
@@ -47,6 +47,7 @@ const turnsUntilBoardChanges = computed<number | null>(() =>
       :delta="lastEvent?.delta ?? null"
       :strategy="run.strategy"
       :mode="run.mode"
+      @leave="emit('leave')"
     />
 
     <main class="game__body">

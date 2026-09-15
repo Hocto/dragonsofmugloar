@@ -5,19 +5,22 @@ import GameScreen from '@/components/GameScreen.vue'
 import GameOverScreen from '@/components/GameOverScreen.vue'
 import ErrorNotice from '@/components/ErrorNotice.vue'
 import { useRun } from '@/composables/useRun'
+import { useRunLocation } from '@/composables/useRunLocation'
 import { useTurnStream } from '@/composables/useTurnStream'
 
 /**
  * The only stateful component. It picks a screen from the store's phase and passes data down;
  * everything below it takes props and emits events.
  *
- * No router. The three screens are phases of one run rather than places you can navigate to or
- * link into, and a URL for "halfway through a game" would be a lie - the run lives on the server
- * and is not restorable from a path. If a second genuinely addressable page ever appears, that is
- * the moment to add one.
+ * No router, but the run id lives in the URL hash. I originally argued a URL for "halfway through a
+ * game" would be a lie because the run was not restorable from a path. That was wrong: the server
+ * holds the run and replays it on request, so the id is exactly what a URL should carry. What is
+ * still true is that one hash pattern does not need a routing library; useRunLocation is the whole
+ * of it. A second addressable page would be the moment to add one.
  */
 const { store, screen, begin, retry, abandon } = useRun()
 const { connected } = useTurnStream()
+useRunLocation()
 
 const retrying = ref(false)
 
@@ -64,6 +67,7 @@ const showError = computed(() => store.error !== null)
       @solve="store.solve"
       @buy="store.buy"
       @wait="store.waitOutTurn"
+      @leave="abandon"
     />
 
     <GameOverScreen

@@ -163,8 +163,9 @@ policy on six methods does not need a circuit breaker library.
 
 Frontend: `vue` and `pinia`; `vite`, `typescript` and `vue-tsc` to build and typecheck; `vitest`,
 `@vue/test-utils`, `jsdom` and `msw` for unit tests; `@playwright/test` for the browser run. No
-component library, because the design is half the exercise. No router, because the three screens
-are phases of one run rather than places you can link into.
+component library, because the design is half the exercise. No router: the run id lives in the URL
+hash so a refresh, a shared link and the back button all work, and one hash pattern is not enough
+routing to justify the dependency.
 
 ## On AI assistance
 

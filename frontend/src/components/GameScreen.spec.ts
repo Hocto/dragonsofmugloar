@@ -35,8 +35,32 @@ describe('GameScreen', () => {
       ads: [ad({ adId: 'a' }), ad({ adId: 'b' }), ad({ adId: 'c' })],
     })
     const labels = screen.findAll('button').map((b) => b.attributes('aria-label') ?? b.text())
+    const pass = labels.findIndex((l) => l.includes('Let the turn pass'))
+    const firstQuest = labels.findIndex((l) => l.includes('Take the quest'))
 
-    expect(labels[0]).toContain('Let the turn pass')
+    expect(pass).toBeGreaterThan(-1)
+    expect(firstQuest).toBeGreaterThan(-1)
+    expect(pass).toBeLessThan(firstQuest)
+  })
+
+  it('lets the player leave from the HUD in either mode', async () => {
+    for (const mode of ['MANUAL', 'AUTO'] as const) {
+      const screen = mountScreen({ mode })
+      const leave = screen.findAll('button').find((b) => b.text() === 'Leave')
+
+      expect(leave, mode).toBeDefined()
+      await leave!.trigger('click')
+      expect(screen.emitted('leave'), mode).toHaveLength(1)
+    }
+  })
+
+  it('tells an auto player the run keeps going without them', () => {
+    const label = mountScreen({ mode: 'AUTO' })
+      .findAll('button')
+      .find((b) => b.text() === 'Leave')!
+      .attributes('aria-label')
+
+    expect(label).toContain('keeps playing on the server')
   })
 
   it('counts down to the soonest expiry, which is when waiting pays off', () => {

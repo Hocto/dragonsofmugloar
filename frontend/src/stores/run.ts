@@ -103,6 +103,31 @@ export const useRunStore = defineStore('run', () => {
     }
   }
 
+  /**
+   * Pick up a run that already exists on the server: after a refresh, from a shared link, or on
+   * the browser's back/forward. The server is the source of truth, so this is a read, and for an
+   * auto run the stream reattaches on its own once the run is in the store.
+   */
+  async function resume(runId: string): Promise<void> {
+    if (run.value?.runId === runId) return
+    phase.value = 'starting'
+    feed.value = []
+    lastEvent.value = null
+    await attempt(
+      () => api.getRun(runId),
+      (view) => {
+        run.value = view
+        feed.value = [...view.events].reverse()
+        lastEvent.value = view.events.at(-1) ?? null
+      },
+      () => resume(runId),
+      'playing',
+    )
+    if (run.value) {
+      phase.value = syncPhase()
+    }
+  }
+
   async function refresh(): Promise<void> {
     const current = run.value
     if (!current) return
@@ -246,6 +271,7 @@ export const useRunStore = defineStore('run', () => {
     isBusy,
     canAct,
     start,
+    resume,
     refresh,
     solve,
     buy,

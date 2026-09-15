@@ -12,7 +12,15 @@ export const handlers = [
     return HttpResponse.json(runView({ mode: body.mode }), { status: 201 })
   }),
 
-  http.get('/api/runs/:runId', () => HttpResponse.json(runView())),
+  http.get('/api/runs/:runId', ({ params }) => {
+    if (params['runId'] === 'gone') {
+      return HttpResponse.json<ApiErrorBody>(
+        { error: 'RUN_NOT_FOUND', message: 'No run with id gone', retryable: false, at: '' },
+        { status: 404 },
+      )
+    }
+    return HttpResponse.json(runView({ runId: String(params['runId']) }))
+  }),
 
   http.post('/api/runs/:runId/solve', () =>
     HttpResponse.json<TurnResultView>({

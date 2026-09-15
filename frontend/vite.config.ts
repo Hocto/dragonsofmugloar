@@ -16,6 +16,13 @@ export default defineConfig({
       '/api': {
         target: process.env.VITE_BACKEND_URL ?? 'http://localhost:8080',
         changeOrigin: true,
+        // changeOrigin rewrites Host but forwards the browser's Origin header untouched, so the
+        // backend saw "Origin: http://localhost:5175" and refused it as cross-origin the moment
+        // the dev server ran on any port but the one in its allowlist. Through the proxy the
+        // request is same-origin from the browser's point of view; make it look that way.
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq) => proxyReq.removeHeader('origin'))
+        },
       },
     },
   },

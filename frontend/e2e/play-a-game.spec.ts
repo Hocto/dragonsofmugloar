@@ -155,3 +155,49 @@ test('an error offers a retry instead of a blank screen', async ({ page }) => {
   await alert.getByRole('button', { name: 'Try again' }).click()
   await expect(page.getByRole('heading', { name: 'The message board' })).toBeVisible()
 })
+
+test('the run survives a refresh and the back button leaves it', async ({ page }) => {
+  await stubBackend(page)
+  await page.goto('/')
+  await page.getByRole('button', { name: /Take the quests yourself/ }).click()
+  await expect(page.getByRole('heading', { name: 'The message board' })).toBeVisible()
+
+  // Starting a run puts its id in the address bar.
+  await expect(page).toHaveURL(/#run\/e2e-1$/)
+
+  // A refresh comes back to the same run, not to the start screen.
+  await page.reload()
+  await expect(page.getByRole('heading', { name: 'The message board' })).toBeVisible()
+  await expect(page.getByText('playing by hand')).toBeVisible()
+
+  // Back returns to the start screen, and the run id leaves the address bar with it.
+  await page.goBack()
+  await expect(page.getByRole('heading', { name: 'Dragons of Mugloar' })).toBeVisible()
+  await expect(page).not.toHaveURL(/#run/)
+})
+
+test('leave is reachable mid-game and returns to the start', async ({ page }) => {
+  await stubBackend(page)
+  await page.goto('/')
+  await page.getByRole('button', { name: /Take the quests yourself/ }).click()
+  await expect(page.getByRole('heading', { name: 'The message board' })).toBeVisible()
+
+  await page.getByRole('button', { name: /^Leave this run/ }).click()
+
+  await expect(page.getByRole('heading', { name: 'Dragons of Mugloar' })).toBeVisible()
+  await expect(page).not.toHaveURL(/#run/)
+})
+
+test('a stale link lands on the start screen with a reason, not a blank page', async ({ page }) => {
+  await page.route('**/api/runs/*', async (route) => {
+    await route.fulfill({
+      status: 404,
+      json: { error: 'RUN_NOT_FOUND', message: 'No run with id gone', retryable: false, at: '' },
+    })
+  })
+
+  await page.goto('/#run/gone')
+
+  await expect(page.getByRole('heading', { name: 'Dragons of Mugloar' })).toBeVisible()
+  await expect(page.getByRole('alert')).toContainText('No run with id gone')
+})

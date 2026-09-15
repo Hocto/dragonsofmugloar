@@ -188,6 +188,38 @@ describe('run store', () => {
     expect(store.run?.failure).toBe('Mugloar returned 503')
   })
 
+  it('resumes a run the server still has, straight into playing', async () => {
+    // After a refresh, from a link, or via the back button: the server is the source of truth.
+    const store = useRunStore()
+
+    await store.resume('g1')
+
+    expect(store.phase).toBe('playing')
+    expect(store.run?.runId).toBe('g1')
+    expect(store.error).toBeNull()
+  })
+
+  it('lands on the start screen with an error when the run is gone', async () => {
+    // A restart drops every run. The link is stale, and the UI should say so rather than spin.
+    const store = useRunStore()
+
+    await store.resume('gone')
+
+    expect(store.phase).toBe('idle')
+    expect(store.run).toBeNull()
+    expect(store.error?.retryable).toBe(false)
+  })
+
+  it('does not refetch a run it already holds', async () => {
+    const store = useRunStore()
+    await store.start('MANUAL')
+    const before = store.run
+
+    await store.resume('g1')
+
+    expect(store.run).toBe(before)
+  })
+
   it('only lets a human act in manual mode', async () => {
     const store = useRunStore()
     await store.start('AUTO')

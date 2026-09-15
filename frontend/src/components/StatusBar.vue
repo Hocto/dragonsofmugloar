@@ -12,6 +12,8 @@ defineProps<{
   mode: string
 }>()
 
+const emit = defineEmits<{ leave: [] }>()
+
 function sign(value: number): string {
   return value > 0 ? `+${value}` : `${value}`
 }
@@ -57,9 +59,25 @@ function sign(value: number): string {
         <dd class="numeral">{{ state.turn }}</dd>
       </div>
     </dl>
-    <p class="hud__mode">
-      {{ mode === 'AUTO' ? `watching ${strategy}` : 'playing by hand' }}
-    </p>
+    <div class="hud__side">
+      <p class="hud__mode">
+        {{ mode === 'AUTO' ? `watching ${strategy}` : 'playing by hand' }}
+      </p>
+      <!--
+        Always reachable, in both modes. An auto run keeps playing on the server after you leave;
+        the label says so rather than letting the button imply it stops anything.
+      -->
+      <button
+        type="button"
+        class="hud__leave"
+        :aria-label="mode === 'AUTO'
+          ? 'Leave this run. The dragon keeps playing on the server; the link in the address bar brings you back.'
+          : 'Leave this run and return to the start. The link in the address bar brings you back.'"
+        @click="emit('leave')"
+      >
+        Leave
+      </button>
+    </div>
   </header>
 </template>
 
@@ -129,11 +147,32 @@ function sign(value: number): string {
   color: var(--wax);
 }
 
+.hud__side {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-3);
+}
+
 .hud__mode {
   font-family: var(--display);
   font-size: 0.8125rem;
   color: var(--ink-faint);
   font-style: italic;
+}
+
+.hud__leave {
+  min-height: 2.25rem;
+  padding: 0.3rem 0.8rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: transparent;
+  font-family: var(--display);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.hud__leave:hover {
+  background: var(--paper-raised);
 }
 
 @media (max-width: 30rem) {
