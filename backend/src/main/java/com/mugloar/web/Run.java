@@ -5,6 +5,7 @@ import com.mugloar.application.TurnAction;
 import com.mugloar.application.TurnEvent;
 import com.mugloar.domain.GameState;
 import com.mugloar.domain.Reputation;
+import com.mugloar.web.dto.RunSummary;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -81,6 +82,34 @@ public final class Run {
 
     public synchronized List<TurnEvent> events() {
         return List.copyOf(events);
+    }
+
+    /** Over every event, not the capped view of them. */
+    public synchronized RunSummary summary() {
+        int solved = 0;
+        int failed = 0;
+        int bought = 0;
+        int idled = 0;
+        for (TurnEvent event : events) {
+            switch (event.action()) {
+                case SOLVED -> {
+                    if (event.success()) {
+                        solved++;
+                    } else {
+                        failed++;
+                    }
+                }
+                case BOUGHT -> {
+                    if (event.success()) {
+                        bought++;
+                    }
+                }
+                case IDLED -> idled++;
+                default -> {
+                }
+            }
+        }
+        return new RunSummary(solved, failed, bought, idled);
     }
 
     long nextSequence() {

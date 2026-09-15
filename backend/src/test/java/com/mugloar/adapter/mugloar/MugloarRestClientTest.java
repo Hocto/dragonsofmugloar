@@ -244,6 +244,33 @@ class MugloarRestClientTest {
     }
 
     @Test
+    void reportsAnAdItCannotDecodeAsAnUpstreamFaultThatIsNotWorthRetrying() {
+        mugloar.stubFor(get(urlEqualTo("/api/v2/g1/messages")).willReturn(okJson("""
+                [{"adId":"x","message":"m","reward":"lots","expiresIn":3,"encrypted":null,"probability":"Risky"}]
+                """)));
+
+        assertThatThrownBy(() -> client.messages("g1"))
+                .isInstanceOfSatisfying(MugloarApiException.class, e -> {
+                    assertThat(e.status()).isEqualTo(MugloarApiException.UNREADABLE_RESPONSE);
+                    assertThat(e.isWorthRetrying()).isFalse();
+                    assertThat(e.getMessage()).contains("cannot read");
+                });
+        // Decoding the same bytes again would fail the same way, so no retry was attempted.
+        mugloar.verify(1, getRequestedFor(urlEqualTo("/api/v2/g1/messages")));
+    }
+
+    @Test
+    void reportsAnUnknownEncodingTheSameWay() {
+        mugloar.stubFor(get(urlEqualTo("/api/v2/g1/messages")).willReturn(okJson("""
+                [{"adId":"x","message":"m","reward":"10","expiresIn":3,"encrypted":7,"probability":"Risky"}]
+                """)));
+
+        assertThatThrownBy(() -> client.messages("g1"))
+                .isInstanceOfSatisfying(MugloarApiException.class,
+                        e -> assertThat(e.status()).isEqualTo(MugloarApiException.UNREADABLE_RESPONSE));
+    }
+
+    @Test
     void treatsAnEmptyBoardAsEmptyRatherThanNull() {
         mugloar.stubFor(get(urlEqualTo("/api/v2/g1/messages")).willReturn(okJson("[]")));
 

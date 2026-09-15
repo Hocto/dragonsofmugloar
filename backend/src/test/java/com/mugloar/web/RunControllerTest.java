@@ -16,6 +16,7 @@ import com.mugloar.application.TurnEvent;
 import com.mugloar.application.port.MugloarApiException;
 import com.mugloar.domain.GameState;
 import com.mugloar.web.dto.AdView;
+import com.mugloar.web.dto.RunSummary;
 import com.mugloar.web.dto.RunView;
 import com.mugloar.web.dto.ShopAdviceView;
 import com.mugloar.web.dto.ShopItemView;
@@ -87,13 +88,18 @@ class RunControllerTest {
     }
 
     @Test
-    void rejectsAModeThatIsNotAMode() throws Exception {
+    void rejectsAModeThatIsNotAModeInTheSameErrorShape() throws Exception {
+        // An enum value that does not exist fails before validation runs. The client should still
+        // get an ApiError with a message, not Spring's default body.
         mvc.perform(post("/api/runs")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"mode":"CHEAT"}
                                 """))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("INVALID_REQUEST"))
+                .andExpect(jsonPath("$.message").isNotEmpty())
+                .andExpect(jsonPath("$.retryable").value(false));
     }
 
     @Test
@@ -210,6 +216,40 @@ class RunControllerTest {
     }
 
     @Test
+    void anUnreadableUpstreamPayloadIsUpstreamsFaultNotTheClients() throws Exception {
+        // Mugloar sent a 200 the adapter could not decode. That is not "your request was bad", and
+        // asking again would decode the same bytes again, so it is 502 and not retryable.
+        given(runs.view("g1")).willThrow(new MugloarApiException(
+                "Mugloar sent an ad this client cannot read: Unknown ad encoding: 7",
+                MugloarApiException.UNREADABLE_RESPONSE));
+
+        mvc.perform(get("/api/runs/g1"))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.error").value("UPSTREAM_ERROR"))
+                .andExpect(jsonPath("$.retryable").value(false));
+    }
+
+    @Test
+    void anUpstream4xxIsNotOfferedAsRetryable() throws Exception {
+        given(runs.view("g1")).willThrow(new MugloarApiException("Mugloar returned 400", 400));
+
+        mvc.perform(get("/api/runs/g1"))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.retryable").value(false));
+    }
+
+    @Test
+    void anUnexpectedExceptionStillReturnsTheErrorShapeWithoutTheDetail() throws Exception {
+        given(runs.view("g1")).willThrow(new NullPointerException("secret internal detail"));
+
+        mvc.perform(get("/api/runs/g1"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.error").value("INTERNAL"))
+                .andExpect(jsonPath("$.retryable").value(false))
+                .andExpect(jsonPath("$.message").value(not(containsString("secret"))));
+    }
+
+    @Test
     void rateLimitingIsPassedThroughAs429() throws Exception {
         given(runs.view("g1")).willThrow(new MugloarApiException("error code: 1015", 429));
 
@@ -244,6 +284,7 @@ class RunControllerTest {
                         false, "NONE", 0.86, 91.0, true, false)),
                 List.of(new ShopItemView("hpot", "Healing potion", 50, false, true, false)),
                 new ShopAdviceView("SKIP", null, "nothing worth buying at 20 gold"),
-                List.of());
+                List.of(),
+                new RunSummary(0, 0, 0, 0));
     }
 }

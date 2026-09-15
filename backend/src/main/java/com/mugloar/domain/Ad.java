@@ -27,9 +27,4 @@ public record Ad(
             throw new IllegalArgumentException("encoding is required");
         }
     }
-
-    /** An ad with one turn left has to be attempted now or never. */
-    public boolean expiresThisTurn() {
-        return expiresIn <= 1;
-    }
 }

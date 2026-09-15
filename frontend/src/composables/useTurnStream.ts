@@ -52,6 +52,17 @@ export function useTurnStream() {
         close()
         return
       }
+      // EventSource only retries on its own after a dropped connection. On a 404 or a 500 it
+      // gives up for good and sits at CLOSED, and counting that as one quiet failure would
+      // leave the chronicle saying "reconnecting" forever. Say so now.
+      if (stream.readyState === EventSource.CLOSED) {
+        close()
+        store.reportStreamError(async () => {
+          failures = 0
+          connect(runId)
+        })
+        return
+      }
       failures += 1
       if (failures > MAX_SILENT_RECONNECTS) {
         close()

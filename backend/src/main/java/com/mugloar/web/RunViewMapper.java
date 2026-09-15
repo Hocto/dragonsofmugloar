@@ -64,7 +64,8 @@ public class RunViewMapper {
                 ads,
                 shop,
                 toAdvice(board.shopRecommendation()),
-                events);
+                events,
+                run.summary());
     }
 
     private AdView toAdView(Ad ad, AdValuation valuation, boolean recommended) {

@@ -1,19 +1,15 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { RunView, TurnEvent } from '@/api/types'
+import type { RunView } from '@/api/types'
 
-const props = defineProps<{ run: RunView; feed: TurnEvent[] }>()
+const props = defineProps<{ run: RunView }>()
 const emit = defineEmits<{ restart: [] }>()
 
-const solved = computed(
-  () => props.feed.filter((e) => e.action === 'SOLVED' && e.success).length,
-)
-const failed = computed(
-  () => props.feed.filter((e) => e.action === 'SOLVED' && !e.success).length,
-)
-const bought = computed(
-  () => props.feed.filter((e) => e.action === 'BOUGHT' && e.success).length,
-)
+// Counts come from the server, over the whole run. The feed the client holds is capped, so a
+// long run or one resumed after a refresh would have under-reported itself if counted here.
+const solved = computed(() => props.run.summary.solved)
+const failed = computed(() => props.run.summary.failed)
+const bought = computed(() => props.run.summary.bought)
 const brokeOff = computed(() => props.run.status === 'FAILED')
 </script>
 

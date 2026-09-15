@@ -45,8 +45,12 @@ public class AutoPlayer {
 
     private void playToTheEnd(Run run) {
         try {
+            boolean firstTurn = true;
             while (run.isRunning() && !run.state().isOver()) {
-                Board board = orchestrator.board(run.state());
+                // start() already fetched a board to answer its own request with; play the first
+                // turn from that one rather than asking Mugloar again a few milliseconds later.
+                Board board = firstTurn && run.board() != null ? run.board() : orchestrator.board(run.state());
+                firstTurn = false;
                 run.board(board);
                 run.record(orchestrator.playTurn(run.state(), board, run.nextSequence()));
                 // Reputation is only ever read while waiting out a bad board, so this picks it up
@@ -63,8 +67,10 @@ public class AutoPlayer {
             log.warn("run.failed gameId={} status={} reason=\"{}\"", run.id(), e.status(), e.getMessage());
             run.record(TurnEvent.failed(run.nextSequence(), run.state(), e.getMessage()));
         } catch (RuntimeException e) {
+            // The detail goes to the log. The browser gets a sentence, not a stack trace.
             log.error("run.crashed gameId={}", run.id(), e);
-            run.record(TurnEvent.failed(run.nextSequence(), run.state(), e.toString()));
+            run.record(TurnEvent.failed(run.nextSequence(), run.state(),
+                    "The run hit an error on our side and could not continue"));
         } finally {
             memories.forget(run.id());
             run.board(null);

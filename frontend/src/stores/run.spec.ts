@@ -3,7 +3,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { useRunStore } from './run'
 import { server } from '@/test/setup'
 import { failing } from '@/test/handlers'
-import { turnEvent } from '@/test/fixtures'
+import { gameState, turnEvent } from '@/test/fixtures'
 
 /**
  * These are about the state machine, not about rendering. The phases are the contract every
@@ -161,6 +161,52 @@ describe('run store', () => {
 
     expect(store.feed).toHaveLength(1)
     expect(store.state?.score).toBe(82)
+  })
+
+  it('refuses a replayed event that arrives after a newer live one', async () => {
+    // Replay and live events come from two server threads and can interleave. A late replay of
+    // turn 3 landing after turn 5 must not wind the HUD back to turn 3.
+    const store = useRunStore()
+    await store.start('AUTO')
+
+    store.applyStreamedTurn(turnEvent({ sequence: 5, state: gameState({ turn: 5, score: 500 }) }))
+    store.applyStreamedTurn(turnEvent({ sequence: 3, state: gameState({ turn: 3, score: 300 }) }))
+
+    expect(store.state?.turn).toBe(5)
+    expect(store.state?.score).toBe(500)
+    expect(store.feed).toHaveLength(1)
+  })
+
+  it('does not let a late replay reopen a finished run', async () => {
+    const store = useRunStore()
+    await store.start('AUTO')
+
+    store.applyStreamedTurn(turnEvent({ sequence: 9, action: 'FINISHED', description: 'Out of lives' }))
+    store.applyStreamedTurn(turnEvent({ sequence: 4, action: 'SOLVED' }))
+
+    expect(store.phase).toBe('gameOver')
+    expect(store.run?.status).toBe('FINISHED')
+  })
+
+  it('coalesces board refreshes so a replay of many events is not many concurrent requests', async () => {
+    const store = useRunStore()
+    await store.start('AUTO')
+    let gets = 0
+    const original = window.fetch
+    window.fetch = (...args) => {
+      if (String(args[0]).includes('/api/runs/g1') && (args[1]?.method ?? 'GET') === 'GET') gets++
+      return original(...args)
+    }
+    try {
+      // Fifty events land while the first refresh is still in flight.
+      const all = Array.from({ length: 50 }, () => store.refreshBoardQuietly())
+      await Promise.all(all)
+      // One in flight, one more for the events that arrived meanwhile. Not fifty.
+      expect(gets).toBeLessThanOrEqual(2)
+      expect(gets).toBeGreaterThanOrEqual(1)
+    } finally {
+      window.fetch = original
+    }
   })
 
   it('ends the run when the stream says it finished', async () => {

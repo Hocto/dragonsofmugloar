@@ -73,7 +73,6 @@ const showError = computed(() => store.error !== null)
     <GameOverScreen
       v-else-if="screen === 'over' && store.run"
       :run="store.run"
-      :feed="store.feed"
       @restart="abandon"
     />
   </div>

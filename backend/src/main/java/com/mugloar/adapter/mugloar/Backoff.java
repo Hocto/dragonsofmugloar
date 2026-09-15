@@ -49,7 +49,7 @@ final class Backoff {
     }
 
     private boolean isWorthRetrying(MugloarApiException e) {
-        return e.isRateLimited() || e.status() >= 500 || e.status() == 0;
+        return e.isWorthRetrying();
     }
 
     private Duration nextWait(Duration current) {

@@ -84,6 +84,14 @@ export interface TurnEvent {
   at: string
 }
 
+/** Counts over the whole run, from the server. The event list the client holds is capped. */
+export interface RunSummary {
+  solved: number
+  failed: number
+  bought: number
+  idled: number
+}
+
 export interface RunView {
   runId: string
   mode: RunMode
@@ -95,7 +103,9 @@ export interface RunView {
   ads: AdView[]
   shop: ShopItemView[]
   shopAdvice: ShopAdviceView
+  /** Most recent only. Anything that counts should use `summary`. */
   events: TurnEvent[]
+  summary: RunSummary
 }
 
 export interface TurnResultView {

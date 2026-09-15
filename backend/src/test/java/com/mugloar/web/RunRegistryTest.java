@@ -59,6 +59,29 @@ class RunRegistryTest {
     }
 
     @Test
+    void summaryCountsEveryEventNotJustTheOnesTheViewShows() {
+        // The view caps events at sixty. A run past that must still report itself in full.
+        Run run = registryHolding(10, new GameMemories())
+                .register(game("long"), RunMode.AUTO, "expected-value");
+        GameState state = game("long");
+        for (int i = 1; i <= 150; i++) {
+            run.record(TurnEvent.solved(i, new com.mugloar.domain.AdValuation(
+                    new com.mugloar.domain.Ad("a" + i, "m", 10, 3,
+                            com.mugloar.domain.RiskLevel.PIECE_OF_CAKE, com.mugloar.domain.AdEncoding.NONE),
+                    0.9, 9, 1, 9), i % 3 != 0, "", state, state));
+        }
+        run.record(TurnEvent.bought(151, new com.mugloar.application.ShopDecision.Buy(
+                new com.mugloar.domain.ShopItem("hpot", "Healing potion", 50), "why"), true, state, state));
+        run.record(TurnEvent.idled(152, "waited", state, state));
+
+        assertThat(run.summary().solved()).isEqualTo(100);
+        assertThat(run.summary().failed()).isEqualTo(50);
+        assertThat(run.summary().bought()).isEqualTo(1);
+        assertThat(run.summary().idled()).isEqualTo(1);
+        assertThat(run.events()).hasSize(152);
+    }
+
+    @Test
     void findsWhatItHoldsAndNothingElse() {
         RunRegistry registry = registryHolding(10, new GameMemories());
         registry.register(game("g1"), RunMode.MANUAL, "expected-value");

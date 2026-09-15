@@ -39,6 +39,13 @@ export const useRunStore = defineStore('run', () => {
   const pendingItemId = ref<string | null>(null)
   /** Turns arriving on the SSE stream, newest first. */
   const feed = ref<TurnEvent[]>([])
+  /**
+   * Highest event sequence applied so far. The server replays history to a new subscriber and
+   * sends live events at the same time, from two threads, so a replayed event can arrive after a
+   * newer live one. Applying it would wind the displayed state backwards. Anything at or below
+   * this number has already been seen or superseded.
+   */
+  let highestSequence = -1
 
   const state = computed(() => run.value?.state ?? null)
   const ads = computed<AdView[]>(() => run.value?.ads ?? [])
@@ -55,6 +62,7 @@ export const useRunStore = defineStore('run', () => {
     pendingAdId.value = null
     pendingItemId.value = null
     feed.value = []
+    highestSequence = -1
   }
 
   /** Every network call in the store goes through here, so error handling exists in one place. */
@@ -94,6 +102,7 @@ export const useRunStore = defineStore('run', () => {
       (view) => {
         run.value = view
         feed.value = [...view.events].reverse()
+        highestSequence = view.events.at(-1)?.sequence ?? -1
       },
       () => start(mode),
       'playing',
@@ -119,6 +128,7 @@ export const useRunStore = defineStore('run', () => {
         run.value = view
         feed.value = [...view.events].reverse()
         lastEvent.value = view.events.at(-1) ?? null
+        highestSequence = view.events.at(-1)?.sequence ?? -1
       },
       () => resume(runId),
       'playing',
@@ -155,6 +165,7 @@ export const useRunStore = defineStore('run', () => {
         run.value = result.run
         lastEvent.value = result.event
         feed.value = [result.event, ...feed.value]
+        highestSequence = Math.max(highestSequence, result.event.sequence)
       },
       () => solve(adId),
       'playing',
@@ -175,6 +186,7 @@ export const useRunStore = defineStore('run', () => {
         run.value = result.run
         lastEvent.value = result.event
         feed.value = [result.event, ...feed.value]
+        highestSequence = Math.max(highestSequence, result.event.sequence)
       },
       () => buy(itemId),
       'playing',
@@ -198,6 +210,7 @@ export const useRunStore = defineStore('run', () => {
         run.value = result.run
         lastEvent.value = result.event
         feed.value = [result.event, ...feed.value]
+        highestSequence = Math.max(highestSequence, result.event.sequence)
       },
       waitOutTurn,
       'playing',
@@ -213,7 +226,10 @@ export const useRunStore = defineStore('run', () => {
    */
   function applyStreamedTurn(event: TurnEvent): void {
     if (!run.value) return
-    if (feed.value.some((seen) => seen.sequence === event.sequence)) return
+    // Not just "seen before": anything older than the newest applied event is stale, whether or
+    // not it is a duplicate. This is what keeps a late replayed event from regressing the HUD.
+    if (event.sequence <= highestSequence) return
+    highestSequence = event.sequence
 
     feed.value = [event, ...feed.value].slice(0, 200)
     lastEvent.value = event
@@ -229,17 +245,39 @@ export const useRunStore = defineStore('run', () => {
     }
   }
 
-  /** Auto runs need the board refreshed alongside the stream; the stream carries state, not ads. */
+  /**
+   * Auto runs need the board refreshed alongside the stream; the stream carries state, not ads.
+   *
+   * Coalesced rather than one request per event. A reconnect replays the whole run, and firing a
+   * GET per replayed event meant a hundred concurrent requests with no guarantee the last to
+   * land was the newest. Now at most one is in flight; events that arrive meanwhile mark it
+   * stale, and one more fetch follows when it finishes.
+   */
+  let boardRefreshInFlight = false
+  let boardRefreshStale = false
+
   async function refreshBoardQuietly(): Promise<void> {
-    const current = run.value
-    if (!current || current.status !== 'RUNNING') return
+    if (boardRefreshInFlight) {
+      boardRefreshStale = true
+      return
+    }
+    boardRefreshInFlight = true
     try {
-      const view = await api.getRun(current.runId)
-      if (run.value && run.value.runId === view.runId) {
-        run.value = { ...view, state: run.value.state }
-      }
-    } catch {
-      // A board refresh failing is cosmetic while the stream is alive, so it stays quiet.
+      do {
+        boardRefreshStale = false
+        const current = run.value
+        if (!current || current.status !== 'RUNNING') return
+        try {
+          const view = await api.getRun(current.runId)
+          if (run.value && run.value.runId === view.runId) {
+            run.value = { ...view, state: run.value.state }
+          }
+        } catch {
+          // A board refresh failing is cosmetic while the stream is alive, so it stays quiet.
+        }
+      } while (boardRefreshStale)
+    } finally {
+      boardRefreshInFlight = false
     }
   }
 

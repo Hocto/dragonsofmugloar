@@ -52,6 +52,7 @@ const run = (over: Record<string, unknown> = {}) => ({
   shop,
   shopAdvice: { action: 'SKIP', itemId: null, reason: 'nothing worth buying at 60 gold' },
   events: [],
+  summary: { solved: 0, failed: 0, bought: 0, idled: 0 },
   ...over,
 })
 
@@ -84,7 +85,11 @@ async function stubBackend(page: Page): Promise<void> {
           delta: { lives: won ? 0 : -1, gold: won ? 82 : 0, score: won ? 82 : 0, level: 0, turn: 1 },
           at: new Date().toISOString(),
         },
-        run: run({ state: next, status: next.lives > 0 ? 'RUNNING' : 'FINISHED' }),
+        run: run({
+          state: next,
+          status: next.lives > 0 ? 'RUNNING' : 'FINISHED',
+          summary: { solved: won ? 1 : 1, failed: solves - 1, bought: 0, idled: 0 },
+        }),
       },
     })
   })
@@ -124,7 +129,9 @@ test('start a game, take a quest, and reach the end of the run', async ({ page }
   // Game over, with a summary and a way back.
   await expect(page.getByRole('heading', { name: 'Out of lives' })).toBeVisible()
   await expect(page.getByText('final score')).toBeVisible()
-  await expect(page.getByText('Quests solved')).toBeVisible()
+  // The counts come from the server's summary, not from whatever the client happened to hold.
+  await expect(page.locator('dt:has-text("Quests solved") + dd')).toHaveText('1')
+  await expect(page.locator('dt:has-text("Quests failed") + dd')).toHaveText('2')
 
   await page.getByRole('button', { name: 'Back to the den' }).click()
   await expect(page.getByRole('heading', { name: 'Dragons of Mugloar' })).toBeVisible()

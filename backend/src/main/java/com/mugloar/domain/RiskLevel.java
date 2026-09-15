@@ -87,11 +87,6 @@ public enum RiskLevel {
         return successRate;
     }
 
-    /** 0.0 for the safest label, 1.0 for the most dangerous one. */
-    public double normalisedRisk() {
-        return (double) ordinal() / (values().length - 1);
-    }
-
     public boolean isKnown() {
         return this != UNKNOWN;
     }

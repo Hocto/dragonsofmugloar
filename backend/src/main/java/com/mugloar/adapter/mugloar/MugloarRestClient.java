@@ -65,7 +65,19 @@ public class MugloarRestClient implements MugloarApi {
                 .retrieve()
                 .onStatus(HttpStatusCode::isError, MugloarRestClient::fail)
                 .body(new ParameterizedTypeReference<List<MessageResponse>>() {})));
-        return raw == null ? List.of() : raw.stream().map(decoder::decode).toList();
+        if (raw == null) {
+            return List.of();
+        }
+        try {
+            return raw.stream().map(decoder::decode).toList();
+        } catch (IllegalArgumentException e) {
+            // Includes NumberFormatException. This is Mugloar's payload being wrong, not the
+            // caller's request, and it has to reach the web layer as an upstream fault so it is
+            // not reported to the browser as "your request was bad".
+            throw new MugloarApiException(
+                    "Mugloar sent an ad this client cannot read: " + e.getMessage(),
+                    MugloarApiException.UNREADABLE_RESPONSE, e);
+        }
     }
 
     @Override

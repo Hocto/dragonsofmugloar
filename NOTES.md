@@ -165,6 +165,20 @@ Auto runs now swap the board without animating it. Manual mode keeps the animati
 is possible there in a backgrounded tab, resolves on return, and a manual board only changes when
 the player acts.
 
+## Retrying a solve that timed out
+
+`Backoff` retries a status of 0, which covers dropped connections and read timeouts, on every call
+including `POST /solve` and `/buy`. Those are not idempotent. If Mugloar applied the first attempt
+and the response was lost, the retry either fails (the ad is gone) or, for a purchase, buys twice.
+The turn is then reported as an error and the local state lags the upstream by one until the next
+successful call reads it back.
+
+This is a known trade-off, not an oversight. The alternative is to not retry writes on timeout,
+which turns every transient blip on a solve into a failed turn. With a ten-second read timeout
+and Mugloar answering in well under one, the double-apply window is narrow, and the next
+successful read corrects the lag. I have not seen it happen. It would be the first thing I would
+suspect if a run's local turn counter ever disagreed with Mugloar's.
+
 ## The longer list of rough edges
 
 - The urgency weight and the floors are hand-tuned, not swept.

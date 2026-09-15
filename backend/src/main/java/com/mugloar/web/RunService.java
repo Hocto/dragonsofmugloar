@@ -44,9 +44,13 @@ public class RunService {
 
     public RunView start(RunMode mode) {
         GameState state = orchestrator.start();
+        // The board is fetched before the run is registered. Registering first left a run in the
+        // registry as RUNNING with no player thread if this fetch threw - a zombie a later visit
+        // to the id would find and watch not move.
+        Board board = orchestrator.board(state);
         Run run = registry.register(state, mode, orchestrator.strategyName());
         run.record(TurnEvent.started(state));
-        run.board(orchestrator.board(state));
+        run.board(board);
         if (mode == RunMode.AUTO) {
             autoPlayer.play(run);
         }
