@@ -63,11 +63,11 @@ describe('run store', () => {
     expect(store.pendingItemId).toBeNull()
   })
 
-  it('spends a turn and no lives when the player lets the turn pass', async () => {
+  it('spends turns and no lives when the player sits the board out', async () => {
     const store = useRunStore()
     await store.start('MANUAL')
 
-    const pending = store.waitOutTurn()
+    const pending = store.waitForBoardToChange()
     expect(store.phase).toBe('resolving')
     await pending
 
@@ -82,17 +82,17 @@ describe('run store', () => {
     const store = useRunStore()
     await store.start('MANUAL')
     // The stubbed board is one ad, and the stub returns the same ad after a pass.
-    await store.waitOutTurn()
+    await store.waitForBoardToChange()
 
-    expect(store.lastBoardChange).toEqual({ expired: 0, arrived: 0 })
+    expect(store.lastBoardChange).toEqual({ turns: 1, expired: 0, arrived: 0 })
   })
 
-  it('will not let the turn pass when it is not the player\'s move', async () => {
+  it('will not wait when it is not the player\'s move', async () => {
     const store = useRunStore()
     await store.start('AUTO')
     store.phase = 'gameOver'
 
-    await store.waitOutTurn()
+    await store.waitForBoardToChange()
 
     expect(store.feed).toHaveLength(0)
   })

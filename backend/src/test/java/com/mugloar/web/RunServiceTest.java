@@ -51,6 +51,62 @@ class RunServiceTest {
     }
 
     @Test
+    void waitingPassesTurnsUntilANoticeExpiresAndRecordsEachOne() {
+        // Two notices, expiring in 3 and 6. Waiting has to spend exactly three turns: the board
+        // is unchanged after the first two passes and loses the first notice on the third.
+        FakeMugloarApi api = new FakeMugloarApi(
+                List.of(ad("soon", 40, 3, RiskLevel.RISKY), ad("later", 40, 6, RiskLevel.RISKY)), SHOP);
+        RunRegistry registry = new RunRegistry(new GameMemories(),
+                new WebProperties(List.of(), Duration.ZERO, 10, Duration.ofMinutes(1)));
+        RunService service = serviceOver(api, registry);
+        String runId = service.start(RunMode.MANUAL).runId();
+
+        var result = service.waitForBoardToChange(runId);
+
+        assertThat(result.run().state().turn()).isEqualTo(3);
+        assertThat(result.run().ads()).extracting(a -> a.adId()).containsExactly("later");
+        assertThat(result.run().summary().idled()).isEqualTo(3);
+        assertThat(api.calls()).filteredOn("investigateReputation"::equals).hasSize(3);
+        assertThat(result.event().action()).isEqualTo(com.mugloar.application.TurnAction.IDLED);
+    }
+
+    @Test
+    void waitingStopsAtTheSafetyCapIfTheBoardNeverChanges() {
+        // Not a real board - nothing lives longer than seven turns - but the loop must terminate
+        // even if that ever stops being true.
+        FakeMugloarApi api = new FakeMugloarApi(List.of(ad("stuck", 40, 99, RiskLevel.RISKY)), SHOP);
+        RunRegistry registry = new RunRegistry(new GameMemories(),
+                new WebProperties(List.of(), Duration.ZERO, 10, Duration.ofMinutes(1)));
+        RunService service = serviceOver(api, registry);
+        String runId = service.start(RunMode.MANUAL).runId();
+
+        var result = service.waitForBoardToChange(runId);
+
+        assertThat(result.run().state().turn()).isEqualTo(10);
+        assertThat(api.calls()).filteredOn("investigateReputation"::equals).hasSize(10);
+    }
+
+    @Test
+    void aFailurePartWayThroughWaitingKeepsTheTurnsAlreadySpent() {
+        // The third pass fails upstream. Two turns were really spent; the run must show them.
+        FakeMugloarApi api = new FakeMugloarApi(List.of(ad("a", 40, 5, RiskLevel.RISKY)), SHOP);
+        int[] reputationCalls = {0};
+        api.failing(call -> "investigateReputation".equals(call) && ++reputationCalls[0] == 3);
+        RunRegistry registry = new RunRegistry(new GameMemories(),
+                new WebProperties(List.of(), Duration.ZERO, 10, Duration.ofMinutes(1)));
+        RunService service = serviceOver(api, registry);
+        String runId = service.start(RunMode.MANUAL).runId();
+
+        assertThatThrownBy(() -> service.waitForBoardToChange(runId))
+                .isInstanceOf(MugloarApiException.class);
+
+        Run run = registry.require(runId);
+        assertThat(run.state().turn()).isEqualTo(2);
+        assertThat(run.summary().idled()).isEqualTo(2);
+        assertThat(run.isRunning()).isTrue();
+    }
+
+    @Test
     void aStartThatSucceedsIsRegisteredWithItsBoardAlreadyInHand() {
         FakeMugloarApi api = new FakeMugloarApi(List.of(ad("a", 40, 5, RiskLevel.PIECE_OF_CAKE)), SHOP);
         RunRegistry registry = new RunRegistry(new GameMemories(),

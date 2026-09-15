@@ -75,8 +75,8 @@ export function buyItem(runId: string, itemId: string): Promise<TurnResultView> 
   })
 }
 
-/** Gives up the turn. Takes no body. */
-export function waitOutTurn(runId: string): Promise<TurnResultView> {
+/** Passes turns until the board changes. Takes no body. */
+export function waitForBoardToChange(runId: string): Promise<TurnResultView> {
   return request<TurnResultView>(`${BASE}/${encodeURIComponent(runId)}/wait`, { method: 'POST' })
 }
 

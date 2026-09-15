@@ -19,29 +19,25 @@ function mountPanel(props: Partial<InstanceType<typeof WaitTurnPanel>['$props']>
 }
 
 describe('WaitTurnPanel', () => {
-  it('says what the move costs and what it risks', () => {
-    expect(mountPanel().text()).toContain('Costs a turn, risks nothing')
+  it('puts the cost in turns on the button itself', () => {
+    expect(mountPanel({ turnsUntilBoardChanges: 3 }).get('button').text()).toBe('Wait 3 turns for a new board')
+    expect(mountPanel({ turnsUntilBoardChanges: 1 }).get('button').text()).toBe('Wait 1 turn for a new board')
+  })
+
+  it('says what the move risks', () => {
+    expect(mountPanel().text()).toContain('Risks nothing')
   })
 
   it('says so when the strategy would also wait', () => {
     expect(mountPanel({ recommended: true }).text()).toContain('Nothing here is worth the risk')
   })
 
-  it('says how long until the board actually changes', () => {
-    // Waiting does not deal a new hand - it ages the board, and the board only changes when
-    // something expires. Without this the move looks like it does nothing.
-    expect(mountPanel({ turnsUntilBoardChanges: 3 }).text()).toContain('Board changes in 3 turns')
+  it('explains why the board changes at all', () => {
+    expect(mountPanel().text()).toContain('The board changes when a notice expires')
   })
 
-  it('gets the singular right on the last turn before the board moves', () => {
-    const text = mountPanel({ turnsUntilBoardChanges: 1 }).text()
-
-    expect(text).toContain('Board changes in 1 turn')
-    expect(text).not.toContain('1 turns')
-  })
-
-  it('says nothing about a countdown when the board is empty', () => {
-    expect(mountPanel({ turnsUntilBoardChanges: null }).text()).not.toContain('Board changes')
+  it('offers a single turn when the board is empty', () => {
+    expect(mountPanel({ turnsUntilBoardChanges: null }).get('button').text()).toBe('Wait 1 turn for a new board')
   })
 
   it('keeps to one row in both states so it does not resize as the board changes', () => {
@@ -79,9 +75,10 @@ describe('WaitTurnPanel', () => {
     expect(mountPanel({ disabled: true }).get('button').attributes('disabled')).toBeDefined()
   })
 
-  it('has an accessible name that explains the consequence', () => {
-    const label = mountPanel().get('button').attributes('aria-label') ?? ''
+  it('has an accessible name that states the cost and the consequence', () => {
+    const label = mountPanel({ turnsUntilBoardChanges: 3 }).get('button').attributes('aria-label') ?? ''
 
+    expect(label).toContain('Wait 3 turns')
     expect(label).toContain('without attempting')
     expect(label).toContain('risks no lives')
   })

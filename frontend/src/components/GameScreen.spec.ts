@@ -36,7 +36,7 @@ describe('GameScreen', () => {
       ads: [ad({ adId: 'a' }), ad({ adId: 'b' }), ad({ adId: 'c' })],
     })
     const labels = screen.findAll('button').map((b) => b.attributes('aria-label') ?? b.text())
-    const pass = labels.findIndex((l) => l.includes('Let the turn pass'))
+    const pass = labels.findIndex((l) => l.includes('Wait '))
     const firstQuest = labels.findIndex((l) => l.includes('Take the quest'))
 
     expect(pass).toBeGreaterThan(-1)
@@ -69,7 +69,7 @@ describe('GameScreen', () => {
       ads: [ad({ adId: 'a', expiresIn: 6 }), ad({ adId: 'b', expiresIn: 2 }), ad({ adId: 'c', expiresIn: 4 })],
     })
 
-    expect(screen.text()).toContain('Board changes in 2 turns')
+    expect(screen.text()).toContain('Wait 2 turns for a new board')
   })
 
   it('urges the pass only when the strategy has refused the whole board', () => {
@@ -116,6 +116,6 @@ describe('GameScreen', () => {
       },
     })
 
-    expect(screen.text()).toContain('You let the turn pass.')
+    expect(screen.text()).toContain('You sat the board out.')
   })
 })

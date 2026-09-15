@@ -19,8 +19,9 @@ import type { AdView, RunMode, RunView, TurnEvent } from '@/api/types'
  */
 export type RunPhase = 'idle' | 'starting' | 'playing' | 'resolving' | 'shopping' | 'gameOver'
 
-/** What the last move did to the board: how many notices left it, how many arrived. */
+/** What the last move did: turns spent, and how many notices left the board and arrived. */
 export interface BoardChange {
+  turns: number
   expired: number
   arrived: number
 }
@@ -67,12 +68,13 @@ export const useRunStore = defineStore('run', () => {
     highestSequence = -1
   }
 
-  function boardChange(before: AdView[], after: AdView[]): BoardChange {
-    const beforeIds = new Set(before.map((ad) => ad.adId))
-    const afterIds = new Set(after.map((ad) => ad.adId))
+  function boardChange(before: RunView, after: RunView): BoardChange {
+    const beforeIds = new Set(before.ads.map((ad) => ad.adId))
+    const afterIds = new Set(after.ads.map((ad) => ad.adId))
     return {
-      expired: before.filter((ad) => !afterIds.has(ad.adId)).length,
-      arrived: after.filter((ad) => !beforeIds.has(ad.adId)).length,
+      turns: after.state.turn - before.state.turn,
+      expired: before.ads.filter((ad) => !afterIds.has(ad.adId)).length,
+      arrived: after.ads.filter((ad) => !beforeIds.has(ad.adId)).length,
     }
   }
 
@@ -166,12 +168,11 @@ export const useRunStore = defineStore('run', () => {
     if (!current || phase.value !== 'playing') return
     phase.value = 'resolving'
     pendingAdId.value = adId
-    const before = current.ads
     await attempt(
       () => api.solveAd(current.runId, adId),
       (result) => {
         run.value = result.run
-        lastBoardChange.value = boardChange(before, result.run.ads)
+        lastBoardChange.value = boardChange(current, result.run)
         lastEvent.value = result.event
         feed.value = [result.event, ...feed.value]
         highestSequence = Math.max(highestSequence, result.event.sequence)
@@ -205,22 +206,21 @@ export const useRunStore = defineStore('run', () => {
     }
   }
 
-  /** Gives up the turn. Uses the solve phase; it is the same kind of move. */
-  async function waitOutTurn(): Promise<void> {
+  /** Passes turns until the board changes. Uses the solve phase; it is the same kind of move. */
+  async function waitForBoardToChange(): Promise<void> {
     const current = run.value
     if (!current || phase.value !== 'playing') return
     phase.value = 'resolving'
-    const before = current.ads
     await attempt(
-      () => api.waitOutTurn(current.runId),
+      () => api.waitForBoardToChange(current.runId),
       (result) => {
         run.value = result.run
-        lastBoardChange.value = boardChange(before, result.run.ads)
+        lastBoardChange.value = boardChange(current, result.run)
         lastEvent.value = result.event
         feed.value = [result.event, ...feed.value]
         highestSequence = Math.max(highestSequence, result.event.sequence)
       },
-      waitOutTurn,
+      waitForBoardToChange,
       'playing',
     )
     if (run.value) {
@@ -315,7 +315,7 @@ export const useRunStore = defineStore('run', () => {
     refresh,
     solve,
     buy,
-    waitOutTurn,
+    waitForBoardToChange,
     reset,
     applyStreamedTurn,
     refreshBoardQuietly,

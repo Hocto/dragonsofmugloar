@@ -1,11 +1,13 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+
 /**
- * The pass move for manual play. Sits above the board so it is reachable without scrolling or
- * tabbing past every quest, and keeps one row in both states so the board does not shift when the
- * recommendation changes. Waiting replaces nothing on the board; it only ages every notice by one
- * turn, so the countdown to the soonest expiry is shown to make the move legible.
+ * Waits until the board changes, for manual play. A single pass replaces nothing on the board,
+ * only ages every notice by one turn, so one click passes as many turns as the soonest expiry
+ * needs and the label states that cost up front. Sits above the board so it is reachable without
+ * scrolling past every quest, and keeps one row in both states so the board does not shift.
  */
-defineProps<{
+const props = defineProps<{
   recommended: boolean
   pending: boolean
   disabled: boolean
@@ -14,20 +16,27 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{ wait: [] }>()
+
+const turns = computed(() => props.turnsUntilBoardChanges ?? 1)
+const label = computed(() =>
+  props.pending
+    ? 'Waiting...'
+    : `Wait ${turns.value} ${turns.value === 1 ? 'turn' : 'turns'} for a new board`,
+)
+const ariaLabel = computed(
+  () =>
+    `Wait ${turns.value} ${turns.value === 1 ? 'turn' : 'turns'} until the board changes, without attempting a quest. Costs ${turns.value} ${turns.value === 1 ? 'turn' : 'turns'} and risks no lives.`,
+)
 </script>
 
 <template>
   <section class="wait" :class="{ 'wait--urged': recommended }" aria-labelledby="wait-heading">
     <p class="wait__copy">
-      <span id="wait-heading" class="wait__heading">Let the turn pass</span>
+      <span id="wait-heading" class="wait__heading">Sit this board out</span>
       <span class="wait__body">
         <template v-if="recommended">Nothing here is worth the risk.</template>
-        <template v-else>Costs a turn, risks nothing.</template>
-        <template v-if="turnsUntilBoardChanges !== null">
-          Board changes in
-          <span class="wait__countdown numeral">{{ turnsUntilBoardChanges }}</span>
-          {{ turnsUntilBoardChanges === 1 ? 'turn' : 'turns' }}.
-        </template>
+        <template v-else>Risks nothing.</template>
+        The board changes when a notice expires.
       </span>
     </p>
 
@@ -36,10 +45,10 @@ const emit = defineEmits<{ wait: [] }>()
       class="seal wait__action"
       :class="{ 'seal--primary': recommended }"
       :disabled="disabled || pending"
-      aria-label="Let the turn pass without attempting a quest. Costs one turn and risks no lives."
+      :aria-label="ariaLabel"
       @click="emit('wait')"
     >
-      {{ pending ? 'Waiting...' : 'Wait it out' }}
+      {{ label }}
     </button>
   </section>
 </template>

@@ -5,10 +5,13 @@ import com.mugloar.application.GameMemories;
 import com.mugloar.application.GameOrchestrator;
 import com.mugloar.application.ShopDecision;
 import com.mugloar.application.TurnEvent;
+import com.mugloar.domain.Ad;
 import com.mugloar.domain.GameState;
 import com.mugloar.web.dto.RunView;
 import com.mugloar.web.dto.TurnResultView;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 
 /**
@@ -20,6 +23,9 @@ public class RunService {
 
     private static final Board NO_BOARD =
             new Board(List.of(), List.of(), List.of(), new ShopDecision.Skip("Run is over"));
+
+    /** Notices expire within seven turns of arriving; this only guards against that ever not holding. */
+    private static final int MAX_WAIT_TURNS = 10;
 
     private final GameOrchestrator orchestrator;
     private final GameMemories memories;
@@ -79,13 +85,33 @@ public class RunService {
         }
     }
 
-    /** Gives up the turn, the same move the strategy makes on a hopeless board. */
-    public TurnResultView waitOutTurn(String runId) {
+    /**
+     * Passes turns until the board changes. A single pass replaces nothing on the board; it only
+     * ages every notice by one turn, so waiting is only meaningful once something expires. Each
+     * turn is recorded as its own event, and a failure part-way leaves the turns already spent.
+     */
+    public TurnResultView waitForBoardToChange(String runId) {
         Run run = registry.require(runId);
         synchronized (run) {
             requireManualAndRunning(run);
-            return afterManualTurn(run, orchestrator.waitOutTurn(run.state(), run.nextSequence()));
+            Set<String> before = adIds(board(run));
+            TurnEvent last = null;
+            for (int turn = 0; turn < MAX_WAIT_TURNS && run.isRunning(); turn++) {
+                last = orchestrator.waitOutTurn(run.state(), run.nextSequence());
+                run.record(last);
+                memories.reputationOf(run.id()).ifPresent(run::reputation);
+                Board fresh = orchestrator.board(run.state());
+                run.board(fresh);
+                if (!adIds(fresh).equals(before)) {
+                    break;
+                }
+            }
+            return new TurnResultView(last, view(run));
         }
+    }
+
+    private static Set<String> adIds(Board board) {
+        return board.ads().stream().map(Ad::adId).collect(Collectors.toSet());
     }
 
     public Run require(String runId) {

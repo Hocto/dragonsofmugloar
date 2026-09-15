@@ -18,27 +18,27 @@ const tone = computed(() => {
 })
 
 const headline = computed(() => {
-  if (props.event.action === 'IDLED') return 'You let the turn pass.'
+  if (props.event.action === 'IDLED') return 'You sat the board out.'
   return props.event.apiMessage ?? (props.event.success ? 'That went well.' : 'That went badly.')
 })
 
-/**
- * What the move did to the board. A pass replaces nothing by itself; it only ages every notice,
- * so the board changes only when something expires. Saying so is what keeps a pass from looking
- * like a no-op.
- */
+/** What the move did to the board: turns spent waiting, and notices that left and arrived. */
 const boardNote = computed(() => {
   const change = props.boardChange
   if (!change) return null
+  const waited =
+    props.event.action === 'IDLED'
+      ? `Waited ${change.turns} ${change.turns === 1 ? 'turn' : 'turns'}. `
+      : ''
   if (change.expired > 0 || change.arrived > 0) {
     const gone = `${change.expired} ${change.expired === 1 ? 'notice' : 'notices'} left the board`
     const came = change.arrived > 0 ? `, ${change.arrived} new` : ''
-    return `${gone}${came}.`
+    return `${waited}${gone}${came}.`
   }
   if (props.event.action !== 'IDLED') return null
-  if (props.turnsUntilBoardChanges === null) return 'The board is empty.'
+  if (props.turnsUntilBoardChanges === null) return `${waited}The board is empty.`
   const t = props.turnsUntilBoardChanges
-  return `Nothing expired. The board changes in ${t} ${t === 1 ? 'turn' : 'turns'}.`
+  return `${waited}Nothing expired. The board changes in ${t} ${t === 1 ? 'turn' : 'turns'}.`
 })
 
 const changes = computed(() => {
@@ -48,8 +48,8 @@ const changes = computed(() => {
   if (d.lives) parts.push(`${d.lives > 0 ? '+' : ''}${d.lives} ${Math.abs(d.lives) === 1 ? 'life' : 'lives'}`)
   if (d.score) parts.push(`+${d.score} score`)
   if (d.level) parts.push(`+${d.level} level`)
-  // The turn is stated only when it is the whole of what happened, as for a pass.
-  if (parts.length === 0 && d.turn) parts.push(`+${d.turn} turn, nothing risked`)
+  // For a wait the board note carries the turn count; the delta here is only the last turn's.
+  if (parts.length === 0 && d.turn && props.event.action !== 'IDLED') parts.push(`+${d.turn} turn`)
   return parts
 })
 </script>
@@ -58,7 +58,8 @@ const changes = computed(() => {
   <div class="result" :class="`result--${tone}`" role="status">
     <p class="result__headline">{{ headline }}</p>
     <p v-if="changes.length" class="result__changes numeral">{{ changes.join(' · ') }}</p>
-    <p v-else class="result__changes">Nothing changed.</p>
+    <!-- A wait's outcome is the board note below, so the generic fallback would contradict it. -->
+    <p v-else-if="event.action !== 'IDLED'" class="result__changes">Nothing changed.</p>
     <p v-if="boardNote" class="result__board">{{ boardNote }}</p>
   </div>
 </template>

@@ -53,10 +53,10 @@ public class RunController {
         return runs.buy(runId, request.itemId());
     }
 
-    /** Gives up the turn. Takes no body; there is nothing to choose. */
+    /** Passes turns until the board changes. Takes no body; there is nothing to choose. */
     @PostMapping("/{runId}/wait")
-    public TurnResultView waitOutTurn(@PathVariable String runId) {
-        return runs.waitOutTurn(runId);
+    public TurnResultView waitForBoardToChange(@PathVariable String runId) {
+        return runs.waitForBoardToChange(runId);
     }
 
     @GetMapping(value = "/{runId}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)

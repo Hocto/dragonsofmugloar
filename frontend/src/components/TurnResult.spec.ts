@@ -33,52 +33,54 @@ describe('TurnResult', () => {
     expect(result.text()).toContain('+82 gold')
   })
 
-  it('does not call a pass a success, and does not claim nothing changed', () => {
-    const result = mountResult({ event: passed() })
+  it('does not call a wait a success and does not claim nothing changed', () => {
+    const result = mountResult({
+      event: passed(),
+      boardChange: { turns: 3, expired: 7, arrived: 7 },
+      turnsUntilBoardChanges: 4,
+    })
 
-    expect(result.text()).toContain('You let the turn pass.')
-    expect(result.text()).toContain('+1 turn, nothing risked')
+    expect(result.text()).toContain('You sat the board out.')
     expect(result.text()).not.toContain('That went well')
     expect(result.text()).not.toContain('Nothing changed')
     expect(result.get('.result').classes()).toContain('result--neutral')
   })
 
-  it('says when a pass changed nothing on the board, and when the board will change', () => {
-    // A pass only ages the board. Without this line it looks like a no-op, because visibly it
-    // very nearly is.
+  it('says how many turns the wait cost and what it changed on the board', () => {
     const result = mountResult({
       event: passed(),
-      boardChange: { expired: 0, arrived: 0 },
-      turnsUntilBoardChanges: 3,
+      boardChange: { turns: 3, expired: 7, arrived: 7 },
+      turnsUntilBoardChanges: 4,
     })
 
-    expect(result.text()).toContain('Nothing expired. The board changes in 3 turns.')
+    expect(result.text()).toContain('Waited 3 turns. 7 notices left the board, 7 new.')
   })
 
-  it('says how many notices a pass removed and replaced when something did expire', () => {
+  it('says so when the wait hit the safety cap without the board changing', () => {
     const result = mountResult({
       event: passed(),
-      boardChange: { expired: 7, arrived: 7 },
+      boardChange: { turns: 10, expired: 0, arrived: 0 },
       turnsUntilBoardChanges: 2,
     })
 
-    expect(result.text()).toContain('7 notices left the board, 7 new.')
+    expect(result.text()).toContain('Waited 10 turns. Nothing expired. The board changes in 2 turns.')
   })
 
-  it('gets the singular right', () => {
+  it('gets the singulars right', () => {
     const result = mountResult({
       event: passed(),
-      boardChange: { expired: 1, arrived: 1 },
+      boardChange: { turns: 1, expired: 1, arrived: 1 },
       turnsUntilBoardChanges: 1,
     })
 
-    expect(result.text()).toContain('1 notice left the board, 1 new.')
+    expect(result.text()).toContain('Waited 1 turn. 1 notice left the board, 1 new.')
   })
 
-  it('says the same for a solve, which replaces the solved notice', () => {
-    const result = mountResult({ boardChange: { expired: 1, arrived: 1 }, turnsUntilBoardChanges: 5 })
+  it('reports the replaced notice on a solve without a waited line', () => {
+    const result = mountResult({ boardChange: { turns: 1, expired: 1, arrived: 1 }, turnsUntilBoardChanges: 5 })
 
     expect(result.text()).toContain('1 notice left the board, 1 new.')
+    expect(result.text()).not.toContain('Waited')
   })
 
   it('marks a failed attempt as bad', () => {

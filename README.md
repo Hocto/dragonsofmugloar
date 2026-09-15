@@ -73,8 +73,9 @@ There is also a way to give up a turn. `investigate/reputation` costs one and ri
 the bot uses it when the whole board is below the survival floor and there is no gold for a potion.
 It is a narrower move than it looks, because waiting adds nothing to the board; it only ages what is
 there. Measured against real play it almost never fires. The details, and why I kept it anyway,
-are in the notes. The player gets the same move on a sixth endpoint, `POST /api/runs/{id}/wait`,
-because manual mode promises the same moves the bot has.
+are in the notes. The player gets a stronger version of the same move on `POST /api/runs/{id}/wait`: one
+click passes turns until a notice actually expires and the board changes, and the button says up
+front how many turns that will cost.
 
 ## What the numbers look like
 

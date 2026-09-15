@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw'
-import { runView, turnEvent } from './fixtures'
+import { gameState, runView, turnEvent } from './fixtures'
 import type { ApiErrorBody, RunView, TurnResultView } from '@/api/types'
 
 /**
@@ -34,13 +34,14 @@ export const handlers = [
       event: turnEvent({
         action: 'IDLED',
         target: null,
-        description: 'Nothing worth attempting at 1 life - waited a turn',
+        description: 'Let the turn pass - waited a turn',
         reward: null,
         risk: null,
         successChance: null,
+        state: gameState({ turn: 2 }),
         delta: { lives: 0, gold: 0, score: 0, level: 0, turn: 1 },
       }),
-      run: runView(),
+      run: runView({ state: gameState({ turn: 2 }) }),
     }),
   ),
 
