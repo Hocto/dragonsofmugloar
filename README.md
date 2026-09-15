@@ -5,8 +5,8 @@ hands you the board so you can play it yourself. The backend owns the Mugloar in
 the decision-making; the browser only ever talks to the backend. Across 30 runs the strategy
 averages about 3,600 points, which clears the 1,000 bar comfortably, though not every run does.
 
-The measurements behind the decisions below — the probes, the tables, the experiments that went the
-wrong way — are in [NOTES.md](NOTES.md). This file is the decisions.
+The measurements behind these decisions are in [NOTES.md](NOTES.md): the probes, the tables, and
+the experiments that went the wrong way. This file is the decisions.
 
 ## Running it
 
@@ -35,7 +35,7 @@ for yourself, `./gradlew :backend:benchmark -Pgames=100` plays a hundred games h
 ## Reading the API first
 
 The published docs are incomplete, and I only found that out by calling the thing. The two fields
-the whole strategy turns on — `probability` and `encrypted` — are not documented at all.
+the whole strategy turns on, `probability` and `encrypted`, are not documented at all.
 `/messages` returns a bare array, not the documented object. Solve responses omit `level` and
 purchase responses omit `score`, so a caller has to carry those across or quietly corrupt its own
 state.
@@ -49,27 +49,27 @@ an eleventh probability label, "Impossible", that only ever appears on encrypted
 
 The first version was reward divided by risk rank, and it had no concept of time. You could see the
 failure in the turn log: a 250-gold notice would sit on the board for six turns while the bot
-cleared 20-gold safe ones, then expire unattempted. An urgency term — `1 + weight / expiresIn`, so
-an ad about to vanish outranks an identical one with turns to spare — is what stopped that.
+cleared 20-gold safe ones, then expire unattempted. What stopped that was an urgency term,
+`1 + weight / expiresIn`, so that an ad about to vanish outranks an identical one with turns to spare.
 
 That gave me `reward × P(success) × urgency`, and then I stopped guessing at `P(success)`. I made
 the bot log every attempt with its label and outcome, played thirty-odd games, and counted about
 440 of them. Two things fell out.
 
 The two bottom labels essentially never pay: "Suicide mission" went 1 for 44 and "Impossible" 0 for
-16, at a life apiece — and my urgency term was actively steering into them, because those ads carry
+16, at a life apiece. And my urgency term was actively steering into them, because those ads carry
 the biggest rewards and the shortest expiry. `RiskLevel` now knows which labels are never worth
 attempting, and the strategy drops them before it looks at a reward.
 
 And dragon level does not make ads easier. I had built it into the probability model on that
-theory; the success rate barely moves with level. What moves is the pay — the same "Piece of cake"
+theory; the success rate barely moves with level. What moves is the pay: the same "Piece of cake"
 is worth about 50 gold at level 2 and about 195 at level 6. So I deleted the class that modelled
 level as a probability, and the shop policy got rewritten around upgrades being where the score
 comes from: heal when lives are low, because lives are the one thing you cannot earn back; then buy
 the cheapest upgrade whenever there is surplus, because every upgrade raises the level by one step
 regardless of price; then nothing, because a purchase costs a turn even when it fails.
 
-There is also a way to give up a turn — `investigate/reputation` costs one and risks nothing — and
+There is also a way to give up a turn. `investigate/reputation` costs one and risks nothing, and
 the bot uses it when the whole board is below the survival floor and there is no gold for a potion.
 It is a narrower move than it looks, because waiting adds nothing to the board; it only ages what is
 there. Measured against real play it almost never fires. The details, and why I kept it anyway,
@@ -105,7 +105,7 @@ is inside the spread of either, so I cannot show which is better. What I can sho
 the labels is what moved the numbers: the same strategy with my guessed scale had a median of 2,323.
 
 Where the points actually come from is levelling. Four runs with upgrades switched off scored 791,
-865, 1,905 and 1,945 against a median of 3,934 with them on — four runs is not a benchmark, but it
+865, 1,905 and 1,945 against a median of 3,934 with them on. Four runs is not a benchmark, but it
 lines up with the reward-by-level numbers.
 
 ## Why the browser never calls Mugloar
@@ -122,14 +122,15 @@ needs to know what a survival floor is. Difficulty arrives as a rank out of elev
 colour, because the requirement is that the scale reads without colour.
 
 If this grew, the first thing I would move is run storage. Runs live in a map, so a restart drops
-them and a second instance cannot see the first one's games — fine for one container, wrong for two.
+them and a second instance cannot see the first one's games. That is fine for one container and
+wrong for two.
 
 ## The look
 
 The reflex for a game API is a dark dashboard, and that is what I was reacting to. The original site
 is a photograph, a red title and plain body text, with torn parchment sheets and pencil sketches set
 into it; I took the parchment and built the whole interface out of it. Warm paper, ink text, one wax
-red for anything urgent or lost, one gold for money, and nothing else gets a colour — which is what
+red for anything urgent or lost, one gold for money, and nothing else gets a colour, which is what
 keeps the red meaningful when an ad is about to expire. Type is system serif stacks rather than a
 web font, so it works with no network inside a container.
 
@@ -147,8 +148,8 @@ web font, so it works with no network inside a container.
 - **The bot's waiting move is very nearly dead code.** Zero triggers in 154 measured turns. If the
   floor is relaxed, it can probably go.
 - **Two testing gaps.** `AutoPlayer`'s thread, the SSE fan-out and registry eviction are only
-  exercised by hand. And the Playwright run stubs the backend at the network boundary — it covers
-  the frontend, not the stack.
+  exercised by hand. And the Playwright run stubs the backend at the network boundary, so it
+  covers the frontend rather than the whole stack.
 
 The longer list is in the notes.
 
@@ -157,8 +158,8 @@ The longer list is in the notes.
 Backend: `spring-boot-starter-web` gives `RestClient` for the Mugloar calls, MVC for my own API and
 `SseEmitter` for the turn stream. `starter-validation` for request bodies. `starter-actuator` only
 for `/actuator/health`, which Compose waits on. `starter-test` and `wiremock-standalone` for the
-tests. Retry is thirty lines in `Backoff` rather than Spring Retry or Resilience4j — one policy on
-six methods does not need a circuit breaker library.
+tests. Retry is thirty lines in `Backoff` rather than Spring Retry or Resilience4j, because one
+policy on six methods does not need a circuit breaker library.
 
 Frontend: `vue` and `pinia`; `vite`, `typescript` and `vue-tsc` to build and typecheck; `vitest`,
 `@vue/test-utils`, `jsdom` and `msw` for unit tests; `@playwright/test` for the browser run. No
@@ -167,7 +168,7 @@ are phases of one run rather than places you can link into.
 
 ## On AI assistance
 
-I built this with Claude Code doing a lot of the typing — the DTO layer, most of the CSS, the first
+I built this with Claude Code doing a lot of the typing: the DTO layer, most of the CSS, the first
 pass of the tests and a draft of this file. The parts I would want to be judged on went the way they
 did because I pushed in that direction: probing the live API instead of trusting the docs, measuring
 the risk labels rather than guessing them, and taking seriously what those measurements said even
