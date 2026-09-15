@@ -5,23 +5,10 @@ import com.mugloar.domain.GameState;
 import java.util.Optional;
 
 /**
- * When giving up the turn is worth it.
- *
- * <p>There is no "pass" in this API, but a turn can still be spent on nothing - asking for the
- * player's reputation costs one and risks nothing. The question this class answers is whether that
- * is ever a better trade than attempting the least bad ad on a board the strategy has refused.
- *
- * <p>What waiting does to the board is less than it looks. The board holds ten ads; solving one
- * drops it and a replacement arrives, but waiting drops nothing, so nothing new arrives. All a turn
- * of waiting does is tick every expiry down by one, and the board only changes when something
- * actually expires. So the number of turns waiting has to buy is the soonest expiry on the board,
- * and there is no point starting unless the remaining budget covers it - otherwise the run spends
- * every turn it has and still ends up taking the same bad ad, just poorer.
- *
- * <p>Measured against real play this fires almost never: at one life the survival floor still
- * admits the two most common labels, so a board with nothing above it is roughly a one-in-two-
- * hundred-and-fifty event. It is kept because it is one branch and it covers throwing a run away,
- * not because it earns its place on the numbers. The README says so at more length.
+ * Decides whether giving up the turn is worthwhile. The reputation call consumes a turn and risks
+ * nothing, which makes it a pass. Waiting replaces nothing on the board: it only ages every ad by
+ * one turn, so the board changes only when an ad expires. Waiting therefore has to cover the
+ * soonest expiry on the board, and is refused when the remaining budget cannot.
  */
 public final class WaitingPolicy {
 
@@ -40,12 +27,7 @@ public final class WaitingPolicy {
         return maxIdleTurns - memory.idlesUsed();
     }
 
-    /**
-     * The reason to wait this turn, or empty if there is not one.
-     *
-     * <p>Only consulted after the strategy has refused every ad and the shop policy has declined
-     * to buy a potion; those two decisions are not repeated here.
-     */
+    /** The reason to wait this turn, or empty. Consulted only after the strategy and shop policy have both declined. */
     public Optional<String> reasonToWait(GameState state, Board board, GameMemory memory) {
         int remaining = remainingBudget(memory);
         if (remaining <= 0) {

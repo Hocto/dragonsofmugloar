@@ -1,12 +1,9 @@
 package com.mugloar.web.dto;
 
 /**
- * An ad as the browser wants it: flat, already scored, already told whether the strategy would
- * touch it.
- *
- * <p>{@code difficultyRank} and {@code difficultyOf} exist so the UI can draw the risk scale as
- * "4 of 11" rather than as a colour. The accessibility requirement says the scale has to be
- * readable without colour, and the cleanest way to guarantee that is to send a number.
+ * An ad as the browser renders it: flat, scored, and flagged with the strategy's verdict.
+ * {@code difficultyRank} and {@code difficultyOf} let the UI express difficulty as "4 of 11" so it
+ * is readable without colour.
  */
 public record AdView(
         String adId,

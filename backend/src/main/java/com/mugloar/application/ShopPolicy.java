@@ -7,30 +7,13 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Decides whether to spend gold this turn, and on what.
- *
- * <p>The ordering below is the whole policy, and it is deliberate:
- *
- * <ol>
- *   <li><b>A potion when lives are low.</b> Lives are the only resource you cannot earn back by
- *       playing well - the score stops the moment they hit zero, and everything banked stays banked.
- *       At 50 gold a potion is also the cheapest thing on the shelf. Buying one at one life is
- *       never wrong; buying one at two lives is usually right, because the alternative is playing
- *       the next few turns from behind the strategy's own survival floor, which is slow.
- *   <li><b>An upgrade once there is surplus.</b> This is where the score comes from. Dragon level
- *       does not make ads easier - I measured that and it is not there - it makes them pay more.
- *       The same "Piece of cake" is worth about 50 gold at level 2 and about 195 at level 6. So an
- *       upgrade is not a small edge on the next attempt, it is a multiplier on every attempt for
- *       the rest of the run. It still goes second, because a multiplier on a run that ends next
- *       turn is worth nothing.
- *   <li><b>Nothing.</b> Buying costs a turn even when it fails, so spending gold with no reason is
- *       strictly worse than solving an ad.
- * </ol>
- *
- * <p>Upgrades are bought cheapest first. Every upgrade in the shop raises the level by one step
- * regardless of price, so 100 gold buys the same progress as 300 - measured, not assumed.
- *
- * <p>No Spring here; it is constructed in {@code StrategyConfiguration}.
+ * Decides whether to spend gold this turn, and on what, in a fixed order: a potion when lives are
+ * at or below the threshold, then the cheapest affordable upgrade while keeping potion money in
+ * reserve, otherwise nothing. Lives are the only resource the game does not give back; upgrades
+ * come second because dragon level multiplies every subsequent reward (measured: the same label
+ * pays roughly four times more at level 6 than at level 2) but is worthless to a run that ends.
+ * Every upgrade raises the level by one regardless of price, so cheapest first. A failed purchase
+ * still consumes a turn, so nothing unaffordable is ever suggested.
  */
 public final class ShopPolicy {
 
@@ -56,7 +39,7 @@ public final class ShopPolicy {
                         affordable.get(),
                         "lives at " + state.lives() + ", healing before anything else");
             }
-            // Can't afford healing and lives are low: hoard, don't spend on upgrades.
+            // Healing is unaffordable and lives are low: keep the gold for a potion.
             return new ShopDecision.Skip(
                     "lives at " + state.lives() + ", saving for a potion (" + state.gold() + " gold)");
         }

@@ -14,13 +14,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
 /**
- * One game, plus everything the UI needs to render it.
- *
- * <p>An auto run keeps playing whether or not a browser is attached, so the event history lives
- * here and a late subscriber gets a replay before the live events. That is the difference between a
- * page you can refresh and one you cannot.
- *
- * <p>The Mugloar game id doubles as the run id. There is no second identifier to keep in sync.
+ * One game and everything the UI needs to render it. The event history lives here so a late
+ * subscriber receives a replay before live events. The Mugloar game id is the run id.
  */
 public final class Run {
 
@@ -35,11 +30,7 @@ public final class Run {
     private volatile RunStatus status = RunStatus.RUNNING;
     private volatile Reputation reputation;
     private volatile String failure;
-    /**
-     * The board this run last acted on. Nothing about it changes between turns, so keeping it here
-     * means rendering a run costs no upstream call at all - which matters, because an auto run
-     * redraws on every event and Mugloar rate limits by IP.
-     */
+    /** The board this run last acted on, cached so rendering costs no upstream call; the upstream rate limits by IP. */
     private volatile Board board;
 
     Run(GameState state, RunMode mode, String strategy) {
@@ -84,7 +75,7 @@ public final class Run {
         return List.copyOf(events);
     }
 
-    /** Over every event, not the capped view of them. */
+    /** Counts over every event, not the capped view. */
     public synchronized RunSummary summary() {
         int solved = 0;
         int failed = 0;
@@ -128,13 +119,7 @@ public final class Run {
         this.board = latest;
     }
 
-    /**
-     * Records a turn and hands it to anyone streaming.
-     *
-     * <p>Only a terminal event closes a run. Lives hitting zero is not enough on its own - the
-     * caller still emits an explicit FINISHED event, so a stream always ends with a clear last
-     * message instead of just going quiet.
-     */
+    /** Records a turn and notifies subscribers. Only a FINISHED or FAILED event closes the run. */
     void record(TurnEvent event) {
         synchronized (this) {
             events.add(event);
@@ -150,13 +135,9 @@ public final class Run {
     }
 
     /**
-     * Takes a snapshot of everything that has happened and starts listening for what happens next,
-     * both under the same lock.
-     *
-     * <p>Doing these separately loses events: a turn recorded between the snapshot and the
-     * subscription is in neither. Under one lock the worst case flips to a duplicate rather than a
-     * gap, and duplicates are already free - every event is numbered and the client drops sequence
-     * numbers it has seen.
+     * Snapshots the history and subscribes under one lock. Done separately, a turn recorded in
+     * between would reach neither; under one lock the worst case is a duplicate, which the client
+     * discards by sequence number.
      */
     synchronized List<TurnEvent> replayAndSubscribe(Consumer<TurnEvent> listener) {
         listeners.add(listener);

@@ -3,11 +3,7 @@ import { computed } from 'vue'
 import DifficultyMeter from './DifficultyMeter.vue'
 import type { AdView } from '@/api/types'
 
-/**
- * One notice pinned to the board.
- *
- * Presentational: it takes an ad and emits an intent. It has never heard of fetch.
- */
+/** One notice on the board. Presentational: takes an ad, emits an intent. */
 const props = defineProps<{
   ad: AdView
   actionable: boolean
@@ -17,7 +13,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{ solve: [adId: string] }>()
 
-/** One turn left means take it now or lose it, and the card says so loudly. */
+/** One turn left: the card marks it as urgent in words as well as style. */
 const urgent = computed(() => props.ad.expiresIn <= 1)
 const fading = computed(() => props.ad.expiresIn <= 2)
 
@@ -76,11 +72,11 @@ const chance = computed(() =>
   border: 1px solid var(--paper-edge);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  /* Pinned by hand, so nothing sits perfectly straight. */
+  /* Slight tilt per card. */
   transform: rotate(var(--tilt, 0deg));
 }
 
-/* The paper darkens and curls as the notice ages. */
+/* The paper darkens as the notice ages. */
 .notice--fading {
   background: linear-gradient(160deg, var(--paper-raised), var(--paper-sunken));
 }

@@ -9,20 +9,16 @@ import com.mugloar.domain.SolveResult;
 import java.util.List;
 
 /**
- * Everything the game logic needs from Mugloar, in domain terms.
- *
- * <p>The adapter behind this deals with HTTP, DTOs, retries and decoding. Above this line none of
- * that exists, which is what makes the orchestrator and the strategies testable without a server.
- *
- * <p>{@code solve} and {@code buy} take the current {@link GameState} rather than a game id because
- * neither response is complete: solve omits the dragon level, buy omits score and high score. The
- * adapter carries the missing fields across so callers always get a whole state back.
+ * Everything the game logic needs from Mugloar, in domain terms; the adapter handles HTTP, DTOs,
+ * retries and decoding. {@code solve} and {@code buy} take the current {@link GameState} because
+ * neither response is complete: solve omits the dragon level, buy omits score and high score, and
+ * the adapter carries those fields across.
  */
 public interface MugloarApi {
 
     GameState startGame();
 
-    /** Decoded and risk-mapped. Callers never see Base64 or ROT13. */
+    /** Decoded and mapped onto the risk scale. */
     List<Ad> messages(String gameId);
 
     List<ShopItem> shop(String gameId);

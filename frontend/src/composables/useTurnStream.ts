@@ -4,14 +4,9 @@ import { useRunStore } from '@/stores/run'
 import type { TurnEvent } from '@/api/types'
 
 /**
- * Subscribes to the per-turn SSE stream for an auto run.
- *
- * The server replays a run's history before sending live turns, so a reconnect is not a special
- * case - it just replays, and the store drops sequence numbers it has already seen. That is why
- * there is no cursor to track here.
- *
- * EventSource reconnects on its own, but it does so silently and forever. After a few failed
- * attempts this stops and hands the user an explicit retry instead of spinning quietly.
+ * Subscribes to the per-turn SSE stream for an auto run. The server replays history before live
+ * turns and the store discards events by sequence number, so reconnecting needs no cursor. After
+ * a few silent reconnects this stops and offers an explicit retry.
  */
 const MAX_SILENT_RECONNECTS = 3
 
@@ -41,20 +36,19 @@ export function useTurnStream() {
     stream.addEventListener('turn', (message) => {
       const event = JSON.parse((message as MessageEvent<string>).data) as TurnEvent
       store.applyStreamedTurn(event)
-      // The stream carries state, not the board, so the ads are refreshed alongside it.
+      // The stream carries state, not the board; the ads are refreshed alongside it.
       void store.refreshBoardQuietly()
     })
 
     stream.addEventListener('error', () => {
       connected.value = false
-      // A completed stream also lands here, and a finished run needs no reconnect.
+      // A completed stream also lands here; a finished run needs no reconnect.
       if (store.phase === 'gameOver') {
         close()
         return
       }
-      // EventSource only retries on its own after a dropped connection. On a 404 or a 500 it
-      // gives up for good and sits at CLOSED, and counting that as one quiet failure would
-      // leave the chronicle saying "reconnecting" forever. Say so now.
+      // EventSource retries a dropped connection on its own but gives up for good on a 404 or
+      // 500, leaving readyState at CLOSED. That is reported immediately.
       if (stream.readyState === EventSource.CLOSED) {
         close()
         store.reportStreamError(async () => {

@@ -6,11 +6,8 @@ import com.mugloar.domain.ShopItem;
 import java.util.List;
 
 /**
- * Everything visible at one moment: the ads, the shop, and what the strategy makes of them.
- *
- * <p>{@code ranked} is the strategy's opinion and is deliberately allowed to be shorter than
- * {@code ads} - anything it refuses to attempt is simply absent, and the UI marks those ads as
- * skipped.
+ * Everything visible at one moment: the ads, the shop, and the strategy's ranking of the ads.
+ * {@code ranked} omits any ad the strategy refuses to attempt; the UI marks those as skipped.
  */
 public record Board(
         List<Ad> ads,

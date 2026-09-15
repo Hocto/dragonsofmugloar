@@ -1,20 +1,13 @@
 /*
- * The look: a tavern notice board, not a dashboard.
- *
- * The original dragonsofmugloar.com is hand-drawn ink on parchment, and the obvious thing to build
- * against a game API is a dark admin panel with neon KPI cards. This is the reaction to that.
- * Warm paper, ink-black text, one wax-red accent for anything urgent, and a single gold tone for
- * money. Nothing else gets a colour, which is what keeps the red meaningful.
- *
- * Type comes from system stacks rather than a web font. It costs one request less, works with no
- * network inside a container, and Iowan/Palatino/Georgia already have the slightly literary feel
- * the parchment wants.
+ * Design tokens. Warm paper, ink text, one red accent reserved for urgency and loss, one gold tone
+ * reserved for money; nothing else is coloured. Type uses system serif and sans stacks, so no font
+ * is fetched and the UI renders without network access.
  */
 
 :root {
   color-scheme: light dark;
 
-  /* Parchment, from the page ground up to a raised notice. */
+  /* Paper surfaces, from page ground to raised notice. */
   --paper: #efe6d2;
   --paper-raised: #f7f0e0;
   --paper-sunken: #e4d8bf;
@@ -24,16 +17,16 @@
   --ink-soft: #5a4c3c;
   --ink-faint: #8a7963;
 
-  /* Wax red. Urgency, danger and loss only. */
+  /* Red: urgency, danger and loss only. */
   --wax: #9b2c1f;
   --wax-soft: #c9503f;
   --wax-wash: rgba(155, 44, 31, 0.09);
 
-  /* Gold. Money, and nothing else. */
+  /* Gold: money only. */
   --gilt: #8a6410;
   --gilt-wash: rgba(180, 138, 39, 0.16);
 
-  /* Moss. Success, and nothing else. */
+  /* Green: success only. */
   --moss: #40632f;
   --moss-wash: rgba(64, 99, 47, 0.13);
 
@@ -61,7 +54,7 @@
   --board-max: 68rem;
 }
 
-/* Candlelight rather than "dark theme": the paper goes to soot, the ink to warm bone. */
+/* Dark scheme: warm dark paper and warm light ink, not a neutral grey theme. */
 @media (prefers-color-scheme: dark) {
   :root {
     --paper: #17130f;

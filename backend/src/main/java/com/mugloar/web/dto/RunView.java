@@ -17,7 +17,7 @@ public record RunView(
         List<AdView> ads,
         List<ShopItemView> shop,
         ShopAdviceView shopAdvice,
-        /** The most recent events only; use {@code summary} for anything that counts. */
+        /** The most recent events only; {@code summary} counts over all of them. */
         List<TurnEvent> events,
         RunSummary summary) {
 }

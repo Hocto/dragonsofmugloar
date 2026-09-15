@@ -12,16 +12,9 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /**
- * Every failure the frontend can see, in one shape.
- *
- * <p>The {@code retryable} flag is the point. The UI has a retry button on every async action, and
- * it should only offer it when trying again could actually work - an upstream 502 yes, a
- * nonexistent ad id no.
- *
- * <p>Upstream detail stays in the log. The browser gets told that Mugloar misbehaved and what it
- * can do about it, not the upstream URL, the status line or the game id embedded in the path -
- * none of which is the browser's business, and all of which is a small gift to anyone poking at
- * the service.
+ * Maps every failure to one {@link ApiError} shape. {@code retryable} is set only when a second
+ * attempt could succeed. Upstream detail (URL, status line, game id) stays in the log and is not
+ * returned to the client.
  */
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -47,8 +40,8 @@ public class ApiExceptionHandler {
                     "Mugloar is rate limiting us. Give it a moment and try again.",
                     true));
         }
-        // The retry flag mirrors what Backoff already knows: a 5xx or a dropped connection may
-        // clear, a 4xx or an unreadable body will do the same thing a second time.
+        // Mirrors the retry rule in Backoff: 5xx and transport failures may clear, a 4xx or an
+        // unreadable body will not.
         boolean retryable = e.isWorthRetrying();
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(ApiError.of(
                 "UPSTREAM_ERROR",
@@ -69,17 +62,14 @@ public class ApiExceptionHandler {
                 .body(ApiError.of("BAD_STATE", e.getMessage(), false));
     }
 
-    /** A body that is not the JSON we expect, e.g. an enum value that does not exist. */
+    /** A body that cannot be read as the expected JSON, e.g. an unknown enum value. */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiError> unreadableBody(HttpMessageNotReadableException e) {
         return ResponseEntity.badRequest()
                 .body(ApiError.of("INVALID_REQUEST", "Request body was not valid", false));
     }
 
-    /**
-     * Anything nobody anticipated. The browser still gets the {@link ApiError} shape, with none of
-     * the detail; the detail goes to the log where it is useful.
-     */
+    /** Any other exception. The client gets the {@link ApiError} shape without the detail, which is logged. */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> unexpected(Exception e) {
         log.error("unexpected.error", e);

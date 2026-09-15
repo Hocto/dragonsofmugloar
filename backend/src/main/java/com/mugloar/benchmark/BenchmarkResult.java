@@ -4,8 +4,8 @@ import java.util.List;
 
 /**
  * @param scores      final score of every game that finished, ascending
- * @param failures    games that ended because Mugloar stopped answering, not because the dragon died
- * @param targetScore the bar being reported against
+ * @param failures    games that ended because the upstream stopped answering
+ * @param targetScore score threshold being reported against
  */
 public record BenchmarkResult(List<Integer> scores, List<String> failures, int targetScore, long elapsedMillis) {
 
@@ -35,7 +35,7 @@ public record BenchmarkResult(List<Integer> scores, List<String> failures, int t
         return scores.isEmpty() ? 0 : scores.get(scores.size() - 1);
     }
 
-    /** The number the task actually asks about. */
+    /** Share of finished games at or above the target. */
     public double shareClearingTarget() {
         if (scores.isEmpty()) {
             return 0;

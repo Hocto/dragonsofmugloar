@@ -1,10 +1,4 @@
-/**
- * The backend's contract, hand-written rather than generated.
- *
- * There are eight types here and generating them would mean a build step, a schema endpoint and a
- * dependency. At this size, typing them by hand and letting the store tests catch drift is the
- * cheaper trade.
- */
+/** The backend's contract. Hand-written; the store tests catch drift. */
 
 export type RunMode = 'AUTO' | 'MANUAL'
 export type RunStatus = 'RUNNING' | 'FINISHED' | 'FAILED'
@@ -34,7 +28,7 @@ export interface AdView {
   expiresIn: number
   /** The label exactly as Mugloar spells it, e.g. "Piece of cake". */
   risk: string
-  /** 1 is safest. Sent as a number so the UI never has to encode difficulty as colour alone. */
+  /** 1 is safest. A number so the UI can express difficulty without colour. */
   difficultyRank: number
   difficultyOf: number
   wasEncoded: boolean
@@ -42,7 +36,7 @@ export interface AdView {
   successChance: number | null
   score: number | null
   recommended: boolean
-  /** True when the strategy refuses to attempt it, e.g. a gamble on the last life. */
+  /** True when the strategy refuses to attempt it. */
   skippedByStrategy: boolean
 }
 
@@ -84,7 +78,7 @@ export interface TurnEvent {
   at: string
 }
 
-/** Counts over the whole run, from the server. The event list the client holds is capped. */
+/** Counts over the whole run, from the server; the event list the client holds is capped. */
 export interface RunSummary {
   solved: number
   failed: number
@@ -103,7 +97,7 @@ export interface RunView {
   ads: AdView[]
   shop: ShopItemView[]
   shopAdvice: ShopAdviceView
-  /** Most recent only. Anything that counts should use `summary`. */
+  /** Most recent only; `summary` counts over all of them. */
   events: TurnEvent[]
   summary: RunSummary
 }

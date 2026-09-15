@@ -18,7 +18,7 @@ body {
   line-height: 1.55;
   color: var(--ink);
   background-color: var(--paper);
-  /* A little tooth on the paper. Two cheap gradients, no image request. */
+  /* Subtle paper texture from two gradients; no image request. */
   background-image:
     radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.5), transparent 45%),
     radial-gradient(circle at 82% 88%, rgba(120, 92, 48, 0.14), transparent 55%);
@@ -44,7 +44,7 @@ button {
   color: inherit;
 }
 
-/* One focus treatment everywhere, and it is never removed. */
+/* One focus treatment everywhere; never removed. */
 :where(a, button, [tabindex]):focus-visible {
   outline: 2px solid var(--wax);
   outline-offset: 3px;
@@ -63,7 +63,7 @@ button {
   border: 0;
 }
 
-/* Buttons are pressed wax seals: flat, bordered, and they move 1px when you push them. */
+/* Buttons: flat, bordered, 1px press on active. */
 .seal {
   display: inline-flex;
   align-items: center;

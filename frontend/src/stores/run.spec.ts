@@ -78,6 +78,15 @@ describe('run store', () => {
     expect(store.feed).toHaveLength(1)
   })
 
+  it('records what the board did on a pass so the UI can say so', async () => {
+    const store = useRunStore()
+    await store.start('MANUAL')
+    // The stubbed board is one ad, and the stub returns the same ad after a pass.
+    await store.waitOutTurn()
+
+    expect(store.lastBoardChange).toEqual({ expired: 0, arrived: 0 })
+  })
+
   it('will not let the turn pass when it is not the player\'s move', async () => {
     const store = useRunStore()
     await store.start('AUTO')

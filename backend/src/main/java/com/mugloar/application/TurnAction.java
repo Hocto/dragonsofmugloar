@@ -8,6 +8,6 @@ public enum TurnAction {
     /** Spent the turn on something harmless because attempting anything would have cost a life. */
     IDLED,
     FINISHED,
-    /** The run stopped because Mugloar stopped answering, not because the dragon died. */
+    /** The run stopped because the upstream stopped answering, not because lives ran out. */
     FAILED
 }

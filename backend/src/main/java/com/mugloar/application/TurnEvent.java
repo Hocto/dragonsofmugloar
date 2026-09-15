@@ -6,12 +6,8 @@ import com.mugloar.domain.RiskLevel;
 import java.time.Instant;
 
 /**
- * One turn, flattened into something that serialises straight onto the SSE stream and reads well in
- * a log line.
- *
- * <p>It carries the reasoning, not just the result: which ad, how likely the strategy thought it
- * was, what it was worth. That is the difference between a UI that shows a bot playing and one that
- * shows why the bot played that way.
+ * One turn, flattened for the SSE stream and the log. Carries the reasoning as well as the result:
+ * which ad, its estimated chance, and what it was worth.
  */
 public record TurnEvent(
         long sequence,

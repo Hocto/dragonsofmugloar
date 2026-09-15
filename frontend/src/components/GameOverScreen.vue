@@ -5,8 +5,7 @@ import type { RunView } from '@/api/types'
 const props = defineProps<{ run: RunView }>()
 const emit = defineEmits<{ restart: [] }>()
 
-// Counts come from the server, over the whole run. The feed the client holds is capped, so a
-// long run or one resumed after a refresh would have under-reported itself if counted here.
+// Counts come from the server over the whole run; the feed the client holds is capped.
 const solved = computed(() => props.run.summary.solved)
 const failed = computed(() => props.run.summary.failed)
 const bought = computed(() => props.run.summary.bought)

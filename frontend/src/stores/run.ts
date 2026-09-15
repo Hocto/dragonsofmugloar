@@ -5,28 +5,30 @@ import { ApiError } from '@/api/client'
 import type { AdView, RunMode, RunView, TurnEvent } from '@/api/types'
 
 /**
- * The run, modelled as an explicit state machine.
+ * The run as an explicit state machine. Every async action has a pending phase, so the UI never
+ * has to infer in-flight state from booleans.
  *
- * The phases are not decoration. Every async action has a pending phase, so the UI never has to
- * guess whether something is in flight, and there is no combination of booleans that can describe
- * a screen that should not exist.
- *
- *   idle      nothing started; the start screen is showing
+ *   idle      nothing started
  *   starting  waiting for POST /api/runs
- *   playing   a board is on screen and it is the player's move (or the bot's)
+ *   playing   a board is on screen
  *   resolving a solve is in flight
  *   shopping  a purchase is in flight
- *   gameOver  the run ended, either out of lives or upstream failure
+ *   gameOver  the run ended, out of lives or by upstream failure
  *
- * `error` is deliberately separate from the phase. A failed request leaves the run where it was and
- * offers a retry; it does not throw the player back to a blank screen.
+ * `error` is separate from the phase: a failed request leaves the run in place and offers a retry.
  */
 export type RunPhase = 'idle' | 'starting' | 'playing' | 'resolving' | 'shopping' | 'gameOver'
+
+/** What the last move did to the board: how many notices left it, how many arrived. */
+export interface BoardChange {
+  expired: number
+  arrived: number
+}
 
 export interface RunErrorState {
   message: string
   retryable: boolean
-  /** Re-runs whatever failed, so the retry button does not need to know what that was. */
+  /** Re-runs whatever failed. */
   retry: () => Promise<void>
 }
 
@@ -35,15 +37,14 @@ export const useRunStore = defineStore('run', () => {
   const run = ref<RunView | null>(null)
   const error = ref<RunErrorState | null>(null)
   const lastEvent = ref<TurnEvent | null>(null)
+  const lastBoardChange = ref<BoardChange | null>(null)
   const pendingAdId = ref<string | null>(null)
   const pendingItemId = ref<string | null>(null)
   /** Turns arriving on the SSE stream, newest first. */
   const feed = ref<TurnEvent[]>([])
   /**
-   * Highest event sequence applied so far. The server replays history to a new subscriber and
-   * sends live events at the same time, from two threads, so a replayed event can arrive after a
-   * newer live one. Applying it would wind the displayed state backwards. Anything at or below
-   * this number has already been seen or superseded.
+   * Highest event sequence applied. Replayed and live events arrive from two server threads and
+   * can interleave; anything at or below this number is stale and is discarded.
    */
   let highestSequence = -1
 
@@ -59,13 +60,23 @@ export const useRunStore = defineStore('run', () => {
     run.value = null
     error.value = null
     lastEvent.value = null
+    lastBoardChange.value = null
     pendingAdId.value = null
     pendingItemId.value = null
     feed.value = []
     highestSequence = -1
   }
 
-  /** Every network call in the store goes through here, so error handling exists in one place. */
+  function boardChange(before: AdView[], after: AdView[]): BoardChange {
+    const beforeIds = new Set(before.map((ad) => ad.adId))
+    const afterIds = new Set(after.map((ad) => ad.adId))
+    return {
+      expired: before.filter((ad) => !afterIds.has(ad.adId)).length,
+      arrived: after.filter((ad) => !beforeIds.has(ad.adId)).length,
+    }
+  }
+
+  /** Every network call goes through here, so error handling exists in one place. */
   async function attempt<T>(
     work: () => Promise<T>,
     onSuccess: (value: T) => void,
@@ -81,7 +92,7 @@ export const useRunStore = defineStore('run', () => {
         ? thrown
         : new ApiError('Something went wrong.', 0, true, 'UNKNOWN')
       error.value = { message: failure.message, retryable: failure.retryable, retry }
-      // Stay where we were rather than blanking the screen: a failed solve is not a lost run.
+      // Keep the run in place; a failed request does not blank the screen.
       phase.value = run.value ? syncPhase() : 'idle'
     } finally {
       pendingAdId.value = null
@@ -112,11 +123,7 @@ export const useRunStore = defineStore('run', () => {
     }
   }
 
-  /**
-   * Pick up a run that already exists on the server: after a refresh, from a shared link, or on
-   * the browser's back/forward. The server is the source of truth, so this is a read, and for an
-   * auto run the stream reattaches on its own once the run is in the store.
-   */
+  /** Loads a run that already exists on the server. For an auto run, the stream reattaches once the run is in the store. */
   async function resume(runId: string): Promise<void> {
     if (run.value?.runId === runId) return
     phase.value = 'starting'
@@ -159,10 +166,12 @@ export const useRunStore = defineStore('run', () => {
     if (!current || phase.value !== 'playing') return
     phase.value = 'resolving'
     pendingAdId.value = adId
+    const before = current.ads
     await attempt(
       () => api.solveAd(current.runId, adId),
       (result) => {
         run.value = result.run
+        lastBoardChange.value = boardChange(before, result.run.ads)
         lastEvent.value = result.event
         feed.value = [result.event, ...feed.value]
         highestSequence = Math.max(highestSequence, result.event.sequence)
@@ -196,18 +205,17 @@ export const useRunStore = defineStore('run', () => {
     }
   }
 
-  /**
-   * Give up the turn. Same phase as a solve, because it is the same kind of move: one turn spent,
-   * board comes back changed.
-   */
+  /** Gives up the turn. Uses the solve phase; it is the same kind of move. */
   async function waitOutTurn(): Promise<void> {
     const current = run.value
     if (!current || phase.value !== 'playing') return
     phase.value = 'resolving'
+    const before = current.ads
     await attempt(
       () => api.waitOutTurn(current.runId),
       (result) => {
         run.value = result.run
+        lastBoardChange.value = boardChange(before, result.run.ads)
         lastEvent.value = result.event
         feed.value = [result.event, ...feed.value]
         highestSequence = Math.max(highestSequence, result.event.sequence)
@@ -220,14 +228,10 @@ export const useRunStore = defineStore('run', () => {
     }
   }
 
-  /**
-   * A turn arrived on the stream. Auto runs are driven entirely by this: the server is the source
-   * of truth for state, and the client only appends.
-   */
+  /** A turn arrived on the stream. The server is the source of truth for state; the client only appends. */
   function applyStreamedTurn(event: TurnEvent): void {
     if (!run.value) return
-    // Not just "seen before": anything older than the newest applied event is stale, whether or
-    // not it is a duplicate. This is what keeps a late replayed event from regressing the HUD.
+    // Anything older than the newest applied event is stale, duplicate or not.
     if (event.sequence <= highestSequence) return
     highestSequence = event.sequence
 
@@ -246,12 +250,9 @@ export const useRunStore = defineStore('run', () => {
   }
 
   /**
-   * Auto runs need the board refreshed alongside the stream; the stream carries state, not ads.
-   *
-   * Coalesced rather than one request per event. A reconnect replays the whole run, and firing a
-   * GET per replayed event meant a hundred concurrent requests with no guarantee the last to
-   * land was the newest. Now at most one is in flight; events that arrive meanwhile mark it
-   * stale, and one more fetch follows when it finishes.
+   * Refreshes the board for an auto run; the stream carries state, not ads. Coalesced: at most one
+   * request is in flight, and events arriving meanwhile trigger one follow-up rather than one
+   * request each.
    */
   let boardRefreshInFlight = false
   let boardRefreshStale = false
@@ -273,7 +274,7 @@ export const useRunStore = defineStore('run', () => {
             run.value = { ...view, state: run.value.state }
           }
         } catch {
-          // A board refresh failing is cosmetic while the stream is alive, so it stays quiet.
+          // A failed board refresh is cosmetic while the stream is alive.
         }
       } while (boardRefreshStale)
     } finally {
@@ -299,6 +300,7 @@ export const useRunStore = defineStore('run', () => {
     run,
     error,
     lastEvent,
+    lastBoardChange,
     pendingAdId,
     pendingItemId,
     feed,

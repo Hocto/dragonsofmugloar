@@ -1,11 +1,10 @@
 package com.mugloar.domain;
 
 /**
- * An ad with the numbers that made it win or lose, kept together so the UI and the logs can show
- * the reasoning rather than just the verdict.
+ * An ad together with the numbers that ranked it, so the UI and logs can show the reasoning.
  *
  * @param expectedGold reward weighted by the estimated success chance
- * @param urgency      1.0 for an ad about to expire, lower for one that can wait
+ * @param urgency      higher for an ad about to expire
  * @param score        the final ranking number
  */
 public record AdValuation(

@@ -7,21 +7,10 @@ import java.util.Optional;
 import java.util.function.UnaryOperator;
 
 /**
- * Per-game memory: the shop listing, the waiting budget spent, the last reputation read.
- *
- * <p>Bounded by lifecycle, not by a number. Every path that puts an entry here also removes it:
- * the auto player and the benchmark forget in a {@code finally}, a manual run forgets when it
- * ends, and the run registry forgets when it evicts an abandoned run. So the store can hold at
- * most one entry per run the registry still knows about plus one per benchmark game in flight,
- * and both of those are already capped elsewhere.
- *
- * <p>An earlier version had a size limit of five hundred with random eviction on top of this. It
- * was a guess, and worse, it was papering over the one real leak - abandoned manual runs, which
- * were evicted from the registry without their memory going with them. Fixing the lifecycle made
- * the number redundant, so it is gone; a bound nobody can derive is not a bound.
- *
- * <p>Synchronized rather than concurrent because the critical sections are one map operation long
- * and the callers are a few dozen virtual threads blocked on HTTP most of the time.
+ * Per-game memory: the shop listing, the waiting budget spent, and the last reputation read.
+ * Bounded by lifecycle rather than by a size limit: every caller that creates an entry also
+ * removes it (auto player and benchmark in a {@code finally}, manual runs on completion, the
+ * registry on eviction), so the store holds at most one entry per live run.
  */
 public final class GameMemories {
 
@@ -42,7 +31,7 @@ public final class GameMemories {
         return Optional.ofNullable(byGame.get(gameId)).map(GameMemory::reputation);
     }
 
-    /** The game is over, or nobody is coming back for it. Whoever created the entry removes it. */
+    /** Removes the entry; called by whichever component created it. */
     public synchronized void forget(String gameId) {
         byGame.remove(gameId);
     }

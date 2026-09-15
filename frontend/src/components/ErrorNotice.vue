@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/** Every failed request lands here: what went wrong, and a way out. No dead ends. */
+/** Every failed request lands here: what went wrong, and a way out. */
 defineProps<{ message: string; retryable: boolean; retrying: boolean }>()
 
 const emit = defineEmits<{ retry: []; dismiss: [] }>()

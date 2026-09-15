@@ -7,11 +7,7 @@ package com.mugloar.application.port;
  */
 public class MugloarApiException extends RuntimeException {
 
-    /**
-     * A 200 whose body could not be turned into domain objects: an unknown encoding, malformed
-     * Base64, a non-numeric reward. Kept distinct from transport failures because retrying it
-     * would just decode the same bytes again.
-     */
+    /** A 200 whose body could not be decoded. Distinct from transport failures because a retry would decode the same bytes. */
     public static final int UNREADABLE_RESPONSE = 200;
 
     private final int status;
@@ -29,20 +25,17 @@ public class MugloarApiException extends RuntimeException {
         return status;
     }
 
-    /** 404 on a game id means the run is gone, not that Mugloar is broken. Worth distinguishing. */
+    /** A 404 on a game id means the game is gone, not that the upstream is down. */
     public boolean isGameGone() {
         return status == 404;
     }
 
-    /** Mugloar rate limits with 429; the runner backs off rather than hammering. */
+    /** The upstream rate limits with 429. */
     public boolean isRateLimited() {
         return status == 429;
     }
 
-    /**
-     * Whether a second attempt could plausibly end differently. Rate limits clear, servers
-     * recover, connections come back; a 4xx or an unreadable body will do the same thing twice.
-     */
+    /** Whether a retry could end differently: rate limits, 5xx and transport failures may; a 4xx or an unreadable body will not. */
     public boolean isWorthRetrying() {
         return isRateLimited() || status >= 500 || status == 0;
     }

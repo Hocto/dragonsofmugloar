@@ -26,14 +26,9 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 /**
- * The Mugloar API over HTTP.
- *
- * <p>Three things this class is responsible for and nothing above it is: turning DTOs into domain
- * types, turning any non-2xx into a {@link MugloarApiException}, and retrying the failures that are
- * worth retrying.
- *
- * <p>Error responses come back as HTML, not JSON, so nothing here tries to parse an error body - it
- * keeps a short snippet for the log and moves on.
+ * The Mugloar API over HTTP: maps DTOs to domain types, turns every non-2xx into a
+ * {@link MugloarApiException}, and retries the failures worth retrying. Error bodies are HTML and
+ * are never parsed; a short snippet is kept for the log.
  */
 public class MugloarRestClient implements MugloarApi {
 
@@ -71,9 +66,8 @@ public class MugloarRestClient implements MugloarApi {
         try {
             return raw.stream().map(decoder::decode).toList();
         } catch (IllegalArgumentException e) {
-            // Includes NumberFormatException. This is Mugloar's payload being wrong, not the
-            // caller's request, and it has to reach the web layer as an upstream fault so it is
-            // not reported to the browser as "your request was bad".
+            // Includes NumberFormatException. An undecodable payload is an upstream fault, not a
+            // bad request, and is reported as such.
             throw new MugloarApiException(
                     "Mugloar sent an ad this client cannot read: " + e.getMessage(),
                     MugloarApiException.UNREADABLE_RESPONSE, e);
@@ -96,7 +90,7 @@ public class MugloarRestClient implements MugloarApi {
     public SolveResult solve(GameState current, String adId) {
         SolveResponse response = backoff.call("solve", () ->
                 post("/{gameId}/solve/{adId}", SolveResponse.class, current.gameId(), adId));
-        // The solve response has no dragon level, so it carries over from the state we came in with.
+        // The solve response omits the dragon level; it carries over from the previous state.
         GameState next = new GameState(
                 current.gameId(), response.lives(), response.gold(), current.level(),
                 response.score(), response.highScore(), response.turn());
@@ -107,7 +101,7 @@ public class MugloarRestClient implements MugloarApi {
     public PurchaseResult buy(GameState current, String itemId) {
         PurchaseResponse response = backoff.call("buy", () ->
                 post("/{gameId}/shop/buy/{itemId}", PurchaseResponse.class, current.gameId(), itemId));
-        // Purchases report no score or high score, so those carry over instead.
+        // The purchase response omits score and high score; they carry over from the previous state.
         GameState next = new GameState(
                 current.gameId(), response.lives(), response.gold(), response.level(),
                 current.score(), current.highScore(), response.turn());
@@ -129,7 +123,7 @@ public class MugloarRestClient implements MugloarApi {
                 .body(type));
     }
 
-    /** Turns transport and parsing failures into the same exception type as HTTP failures. */
+    /** Maps transport and parsing failures to the same exception type as HTTP failures. */
     private static <T> T guard(Supplier<T> call) {
         try {
             return call.get();

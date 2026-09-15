@@ -18,16 +18,11 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
-/**
- * Flattens the domain into the shapes the browser renders.
- *
- * <p>The scoring lives on this side of the wire on purpose. The frontend should not need to know
- * what a survival floor is to draw an ad card - it gets a number, a rank and a recommended flag.
- */
+/** Flattens the domain into the shapes the browser renders; the frontend receives scores and flags, not rules. */
 @Component
 public class RunViewMapper {
 
-    /** Excludes UNKNOWN, which is a fallback rather than a rung on the ladder. */
+    /** Excludes UNKNOWN, which is a fallback rather than a step on the scale. */
     private static final int DIFFICULTY_STEPS = RiskLevel.values().length - 1;
 
     private static final int MAX_EVENTS_IN_VIEW = 60;

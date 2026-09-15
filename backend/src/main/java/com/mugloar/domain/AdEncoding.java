@@ -1,12 +1,9 @@
 package com.mugloar.domain;
 
 /**
- * How an ad's text fields arrive over the wire.
- *
- * <p>The API signals this with an {@code encrypted} field that is {@code null}, {@code 1} or
- * {@code 2}. None of it is in the published docs; the values came from watching real responses.
- * Note that the encoding covers {@code adId} too, so the id has to be decoded before it can be
- * used in a solve call.
+ * How an ad's text fields arrive over the wire, signalled by the undocumented {@code encrypted}
+ * field ({@code null}, {@code 1} or {@code 2}). The encoding covers {@code adId} as well, so the id
+ * must be decoded before it is used in a solve call.
  */
 public enum AdEncoding {
     /** {@code encrypted: null} - plain text. */

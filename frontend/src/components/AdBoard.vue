@@ -11,18 +11,15 @@ const props = defineProps<{
 }>()
 
 /**
- * Animate the board only when a person is reading it.
- *
- * In manual mode the board changes when the player acts, and an expiring notice lifting off is
- * worth seeing. In auto mode it is replaced two or three times a second, so per-card enter and
- * leave animations are just churn - and they never finish in a backgrounded tab, because a paused
- * animation frame leaves Vue's leave transition stranded and the elements pile up in the DOM.
+ * Animates the board only in manual mode. In auto mode the board is replaced several times a
+ * second, and a backgrounded tab pauses animation frames, which strands Vue's leave transition and
+ * leaves the elements in the DOM.
  */
 const animated = computed(() => props.actionable)
 
 const emit = defineEmits<{ solve: [adId: string] }>()
 
-/** Most urgent first, then most valuable. The same order a person would read the board in. */
+/** Most urgent first, then most valuable. */
 const ordered = computed(() =>
   [...props.ads].sort((a, b) => a.expiresIn - b.expiresIn || b.reward - a.reward),
 )
@@ -36,10 +33,7 @@ const ordered = computed(() =>
       Nothing pinned up right now.
     </p>
 
-    <!--
-      Keyed by adId so Vue moves cards rather than rebuilding them, which is what makes an
-      expiring notice leave cleanly instead of the whole board flickering.
-    -->
+    <!-- Keyed by adId so Vue moves cards rather than rebuilding them. -->
     <TransitionGroup v-else tag="ul" name="notice" class="board__list" :css="animated">
       <AdCard
         v-for="ad in ordered"
@@ -78,7 +72,7 @@ const ordered = computed(() =>
   position: relative;
 }
 
-/* Give each card a slightly different tilt so the board is not a spreadsheet. */
+/* A slightly different tilt per card. */
 .board__list > :nth-child(3n + 1) {
   --tilt: -0.5deg;
 }
@@ -99,7 +93,7 @@ const ordered = computed(() =>
   transform: translateY(-6px) rotate(var(--tilt, 0deg));
 }
 
-/* Expiring notices lift off the board rather than blinking out. */
+/* Expiring notices lift off the board. */
 .notice-leave-to {
   opacity: 0;
   transform: translateY(-14px) rotate(calc(var(--tilt, 0deg) - 2deg));

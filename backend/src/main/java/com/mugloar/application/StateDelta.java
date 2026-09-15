@@ -2,10 +2,7 @@ package com.mugloar.application;
 
 import com.mugloar.domain.GameState;
 
-/**
- * What one turn changed. The UI shows these next to the result so a player can see "-1 life, +82
- * gold" without diffing two HUDs in their head.
- */
+/** What one turn changed, shown next to the result so the player does not have to diff two HUDs. */
 public record StateDelta(int lives, int gold, int score, int level, int turn) {
 
     public static final StateDelta NONE = new StateDelta(0, 0, 0, 0, 0);

@@ -1,23 +1,9 @@
 <script setup lang="ts">
 /**
- * The pass move, for a human.
- *
- * There is no "skip" in the Mugloar API, but a turn can still be given up, and the bot already does
- * it when every notice on the board is a bad bet. Manual mode promises the same board, the same
- * shop and the same moves, so it gets the same option.
- *
- * It sits above the board rather than below it. The moment you need it most is the moment the whole
- * board is a bad bet, and burying it under ten quest cards meant scrolling past every tempting
- * mistake to reach it - and tabbing through ten "Take the quest" buttons to get there by keyboard.
- *
- * One row in both states, so the panel does not resize when the board changes underneath it. It is
- * never disabled on the grounds that waiting looks unwise; when the strategy would also wait it
- * says so and leaves the decision alone.
- *
- * The countdown is the part that makes the move make sense. Waiting does not deal a new hand - the
- * board holds ten notices, solving one replaces it, and waiting replaces nothing. All a turn does
- * is age every notice by one, so the board changes only when something expires. Without saying how
- * far away that is, passing looks like it does nothing, because for that turn it very nearly does.
+ * The pass move for manual play. Sits above the board so it is reachable without scrolling or
+ * tabbing past every quest, and keeps one row in both states so the board does not shift when the
+ * recommendation changes. Waiting replaces nothing on the board; it only ages every notice by one
+ * turn, so the countdown to the soonest expiry is shown to make the move legible.
  */
 defineProps<{
   recommended: boolean

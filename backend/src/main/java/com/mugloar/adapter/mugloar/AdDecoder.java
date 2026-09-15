@@ -9,16 +9,9 @@ import java.util.Base64;
 import java.util.function.UnaryOperator;
 
 /**
- * The one place an encoded ad is turned back into a readable one.
- *
- * <p>Some ads arrive obfuscated - Base64 when {@code encrypted} is 1, ROT13 when it is 2 - and the
- * obfuscation covers {@code adId} as well as the text. That matters: posting the encoded id to
- * {@code /solve} returns 400, and posting the decoded one works. I checked, because getting it
- * wrong is a silent 400 loop.
- *
- * <p>Everything above the adapter sees a decoded {@link Ad} and never has to ask. Keeping this in a
- * single class is what makes that true - there is no second place that could decode differently, and
- * the frontend cannot get it wrong because the frontend never sees an encoded payload at all.
+ * The single place an encoded ad is decoded. Ads arrive Base64 when {@code encrypted} is 1 and
+ * ROT13 when it is 2, and the encoding covers {@code adId} as well as the text: posting the encoded
+ * id to {@code /solve} returns 400. Everything above the adapter sees a decoded {@link Ad}.
  */
 public final class AdDecoder {
 
@@ -51,10 +44,7 @@ public final class AdDecoder {
         return new String(BASE64.decode(value), StandardCharsets.UTF_8);
     }
 
-    /**
-     * ROT13 over ASCII letters only. The messages contain accented characters ("Corné", "Aurélio")
-     * and those are left alone, which is what the game does too.
-     */
+    /** ROT13 over ASCII letters only; accented characters are left unchanged, as the game does. */
     private static String rot13(String value) {
         if (value == null) {
             return null;
@@ -71,7 +61,7 @@ public final class AdDecoder {
         return new String(chars);
     }
 
-    /** The docs type reward as a String, the live API sends a number. Accept either. */
+    /** The docs type reward as a String and the API sends a number; both are accepted. */
     private static int parseReward(String reward) {
         if (reward == null || reward.isBlank()) {
             return 0;

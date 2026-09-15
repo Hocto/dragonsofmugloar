@@ -1,10 +1,7 @@
 <script setup lang="ts">
 import type { ShopItemView, ShopAdviceView } from '@/api/types'
 
-/**
- * The shop. Affordability is the only thing that matters at a glance, so it is spelled out in
- * words on the row rather than implied by a greyed-out button.
- */
+/** The shop. Affordability is spelled out in words on each row. */
 defineProps<{
   items: ShopItemView[]
   advice: ShopAdviceView | null

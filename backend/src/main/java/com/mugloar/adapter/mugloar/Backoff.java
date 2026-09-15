@@ -7,14 +7,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Retry with exponential backoff, for the handful of calls this app makes.
- *
- * <p>Deliberately not Spring Retry or Resilience4j. Those are the right answer when you need
- * circuit breakers, bulkheads and metrics; here it is one policy applied to six methods, and thirty
- * lines is cheaper to read than a dependency plus its configuration.
- *
- * <p>What is retried matters more than how: 429 and 5xx and transport failures are worth another
- * go, and every other 4xx is a bug in the request that will fail identically the second time.
+ * Retry with exponential backoff. Only 429, 5xx and transport failures are retried; any other 4xx
+ * and an unreadable body would fail identically on a second attempt.
  */
 final class Backoff {
 

@@ -5,10 +5,10 @@ import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * @param allowedOrigins  only needed for the Vite dev server; in Docker the UI is same-origin
- * @param autoTurnDelay   pause between automatic turns so a human can follow the stream
- * @param maxRuns         cap on runs held in memory before the oldest finished ones are dropped
- * @param streamTimeout   how long an idle SSE connection is held open
+ * @param allowedOrigins CORS origins for the development server; unused when the UI is proxied
+ * @param autoTurnDelay  pause between automatic turns
+ * @param maxRuns        cap on runs held in memory before finished ones are evicted
+ * @param streamTimeout  how long an idle SSE connection is held open
  */
 @ConfigurationProperties(prefix = "mugloar.web")
 public record WebProperties(

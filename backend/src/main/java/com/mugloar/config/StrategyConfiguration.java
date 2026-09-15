@@ -12,17 +12,11 @@ import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * The only place that knows both Spring and the game logic.
- *
- * <p>Everything in {@code domain} and {@code application} is plain Java with constructors, so it is
- * assembled here rather than annotated in place. That is what lets the strategy tests instantiate a
- * strategy with {@code new} and no application context at all.
- */
+/** Application classes are plain Java; they are wired here. */
 @Configuration
 public class StrategyConfiguration {
 
-    /** Both strategies are built here; {@code mugloar.strategy.name} decides which one plays. */
+    /** Both strategies are constructed; {@code mugloar.strategy.name} selects one. */
     @Bean
     AdSelectionStrategy adSelectionStrategy(StrategyProperties properties) {
         List<AdSelectionStrategy> available = List.of(

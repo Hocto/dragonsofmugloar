@@ -5,13 +5,9 @@ import com.mugloar.domain.ShopItem;
 import java.util.List;
 
 /**
- * What is remembered between turns of one game.
- *
- * <p>Three things, none of which Mugloar will tell us twice for free: the shop listing, which never
- * changes and costs a rate-limited request to refetch; how much of the waiting budget has been
- * spent; and the last reputation reading, which only exists because waiting is what fetches it.
- *
- * <p>Immutable. Every change is a new value, so the store can swap it in atomically.
+ * What is remembered between turns of one game: the shop listing (constant for the game, and a
+ * rate-limited request to refetch), the waiting budget spent, and the last reputation read.
+ * Immutable; every change is a new value.
  */
 public record GameMemory(List<ShopItem> shop, int idlesUsed, Reputation reputation) {
 

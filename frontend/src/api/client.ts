@@ -1,16 +1,13 @@
 import type { RunMode, RunView, TurnResultView, ApiErrorBody } from './types'
 
 /**
- * One function per backend endpoint, and the only place in the app that knows about fetch.
- *
- * Everything is relative to /api. In development Vite proxies that to :8080 and in Docker nginx
- * does the same, so the browser is always talking to its own origin and there is no base URL to
- * configure at build time.
+ * One function per backend endpoint; the only place that calls fetch. Paths are relative to /api,
+ * which the dev server and nginx both proxy same-origin.
  */
 
 const BASE = '/api/runs'
 
-/** A failure the UI can act on: it knows whether offering "try again" makes any sense. */
+/** A failure the UI can act on; `retryable` says whether a second attempt could succeed. */
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -31,7 +28,7 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
       ...init,
     })
   } catch {
-    // Network-level failure: no response at all, and retrying is exactly the right suggestion.
+    // No response at all; a retry may succeed.
     throw new ApiError('Could not reach the server.', 0, true, 'NETWORK')
   }
 
@@ -46,7 +43,7 @@ async function toApiError(response: Response): Promise<ApiError> {
     const body = (await response.json()) as ApiErrorBody
     return new ApiError(body.message, response.status, body.retryable, body.error)
   } catch {
-    // The backend always sends JSON errors, but a proxy in front of it might not.
+    // The backend sends JSON errors; a proxy in front of it might not.
     return new ApiError(
       `The server replied ${response.status}.`,
       response.status,
@@ -78,12 +75,12 @@ export function buyItem(runId: string, itemId: string): Promise<TurnResultView> 
   })
 }
 
-/** Give up the turn. No body: there is nothing to choose, which is the point of the move. */
+/** Gives up the turn. Takes no body. */
 export function waitOutTurn(runId: string): Promise<TurnResultView> {
   return request<TurnResultView>(`${BASE}/${encodeURIComponent(runId)}/wait`, { method: 'POST' })
 }
 
-/** The SSE endpoint. Subscribing is the composable's job; this just names the URL. */
+/** The SSE endpoint URL; subscribing is the composable's job. */
 export function streamUrl(runId: string): string {
   return `${BASE}/${encodeURIComponent(runId)}/stream`
 }

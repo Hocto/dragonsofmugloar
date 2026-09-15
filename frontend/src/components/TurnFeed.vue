@@ -1,13 +1,7 @@
 <script setup lang="ts">
 import type { TurnEvent } from '@/api/types'
 
-/**
- * The live turn feed for auto runs.
- *
- * It reads as a chronicle rather than a log table, and every line carries the reasoning the
- * backend sent - what the bot picked, how likely it thought it was, what it cost. Watching a bot
- * play is only interesting if you can see why it played that way.
- */
+/** The live turn feed for auto runs. Each line carries the reasoning the backend sent, not just the result. */
 defineProps<{ events: TurnEvent[]; connected: boolean }>()
 
 function headline(event: TurnEvent): string {
@@ -15,7 +9,7 @@ function headline(event: TurnEvent): string {
     case 'STARTED':
       return 'Set out from the dragon den.'
     case 'BOUGHT':
-      // The detail line below carries the item name and the reason, so the headline stays short.
+      // The detail line carries the item name and reason.
       return event.success ? 'Went shopping.' : 'Could not afford it.'
     case 'IDLED':
       return 'Waited out the turn.'
@@ -48,10 +42,8 @@ function deltaParts(event: TurnEvent): string[] {
     </h2>
 
     <!--
-      role="log" rather than an assertive live region. An auto run produces a turn every few
-      hundred milliseconds, and announcing each one turns a screen reader into a metronome. The
-      region is navigable; the HUD and the result panel are where the important changes are said
-      out loud.
+      role="log" rather than a live region: an auto run produces a turn every few hundred
+      milliseconds, and announcing each would be noise. The HUD and result panel announce changes.
     -->
     <ol class="feed__list" role="log" aria-label="Turn by turn chronicle">
       <li

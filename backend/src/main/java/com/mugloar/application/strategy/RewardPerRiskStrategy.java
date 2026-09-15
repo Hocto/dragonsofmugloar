@@ -7,12 +7,8 @@ import java.util.Comparator;
 import java.util.List;
 
 /**
- * The first thing I wrote: reward divided by risk.
- *
- * <p>It is kept because a benchmark number only means something next to another one. It loses for
- * two specific reasons. It has no concept of time, so it leaves a 250 gold ad on the board while it
- * clears cheap safe ones and the good ad expires. And it has no floor, so a big enough reward will
- * talk it into a "Suicide mission" on its last life.
+ * Ranks ads by reward divided by risk rank. Kept as a baseline for the benchmark. It has no notion
+ * of expiry and no survival floor.
  */
 public final class RewardPerRiskStrategy implements AdSelectionStrategy {
 

@@ -17,13 +17,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
- * The API the browser talks to.
- *
- * <p>This layer is the reason the browser never calls Mugloar. That is a decision, not an accident:
- * the strategy, the scoring and the ad decoding are all server side, so there is exactly one
- * implementation of each and the frontend cannot drift from it. It also means the game credentials
- * and the upstream base URL stay out of a bundle anyone can read, and CORS never enters the picture
- * because the only cross-origin call in the system is one this service makes from Java.
+ * The API the browser talks to. The browser never calls Mugloar directly: strategy, scoring and
+ * decoding exist once, on the server, and the upstream URL stays out of the client bundle.
  */
 @RestController
 @RequestMapping("/api/runs")
@@ -58,12 +53,7 @@ public class RunController {
         return runs.buy(runId, request.itemId());
     }
 
-    /**
-     * Give up the turn. No body: there is nothing to choose, which is the point of the move.
-     *
-     * <p>A sixth endpoint beyond the five the brief lists, added because manual mode promises the
-     * same moves the bot has and the bot can do this one.
-     */
+    /** Gives up the turn. Takes no body; there is nothing to choose. */
     @PostMapping("/{runId}/wait")
     public TurnResultView waitOutTurn(@PathVariable String runId) {
         return runs.waitOutTurn(runId);

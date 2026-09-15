@@ -3,10 +3,9 @@ package com.mugloar.adapter.mugloar.dto;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 /**
- * {@code shoppingSuccess} is documented as a String and has been seen as both a JSON boolean and
- * the strings "True"/"False", so it is bound as a String and parsed leniently.
- *
- * <p>No {@code score} or {@code highScore} here; those carry over from the previous state.
+ * {@code shoppingSuccess} is documented as a String and arrives as a boolean, so it is bound as a
+ * String and parsed leniently. {@code score} and {@code highScore} are absent and carry over from
+ * the previous state.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record PurchaseResponse(

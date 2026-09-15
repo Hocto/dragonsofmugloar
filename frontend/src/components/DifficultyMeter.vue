@@ -2,11 +2,8 @@
 import { computed } from 'vue'
 
 /**
- * The risk scale, drawn as filled pips.
- *
- * The requirement is that difficulty is readable without colour, so the pips carry the meaning and
- * the label carries it again in words. Colour is the third signal, not the first - remove it
- * entirely and this still reads "4 of 11, Quite likely".
+ * The risk scale as filled pips. The pips and the label carry the meaning; colour is a third,
+ * redundant signal, so the meter reads without it.
  */
 const props = defineProps<{
   label: string

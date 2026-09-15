@@ -10,7 +10,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
-/** Wires the HTTP side. Base URL and both timeouts come from application.yml. */
+/** Wires the HTTP client. Base URL and timeouts come from application.yml. */
 @Configuration
 public class MugloarClientConfiguration {
 

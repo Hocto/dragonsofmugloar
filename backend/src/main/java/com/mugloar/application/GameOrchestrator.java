@@ -16,17 +16,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Plays the game, one turn at a time.
- *
- * <p>Turn-at-a-time rather than a {@code while (alive)} loop on purpose: the same object then drives
- * the auto runs, the benchmark and the manual mode, and the web layer decides how fast to call it.
- *
- * <p>This class is the choreography and nothing else. What to attempt is {@link AdSelectionStrategy},
- * what to buy is {@link ShopPolicy}, whether to wait is {@link WaitingPolicy}, and what is
- * remembered between turns lives in {@link GameMemories}. Each of those is testable alone; this
- * one is tested by driving whole games through it against a scripted API.
- *
- * <p>No Spring annotations - it is wired in {@code StrategyConfiguration}.
+ * Plays the game one turn at a time, so the same object drives auto runs, manual mode and the
+ * benchmark and the caller controls pacing. What to attempt is {@link AdSelectionStrategy}, what
+ * to buy is {@link ShopPolicy}, whether to wait is {@link WaitingPolicy}, and per-game state lives
+ * in {@link GameMemories}.
  */
 public final class GameOrchestrator {
 
@@ -62,11 +55,7 @@ public final class GameOrchestrator {
         return state;
     }
 
-    /**
-     * The board has to be fresh every turn. The shop listing does not - the same eleven items at
-     * the same prices come back every turn of every game - so it is fetched once and remembered.
-     * Both reads are free in game terms but not in practice; Mugloar rate limits per IP.
-     */
+    /** Fetches the board; the shop listing is constant for a game and is fetched once, since the upstream rate limits per IP. */
     public Board board(GameState state) {
         List<Ad> ads = api.messages(state.gameId());
         List<ShopItem> shop = shopFor(state.gameId());
@@ -92,12 +81,8 @@ public final class GameOrchestrator {
     }
 
     /**
-     * One automatic turn from a board the caller already has: shop if the policy says so, attempt
-     * the best-scoring ad if there is one, wait if waiting can help, and otherwise take the least
-     * bad ad on the board.
-     *
-     * <p>Taking the board as an argument rather than fetching it is what stops the web layer from
-     * reading the message board twice per turn - once to play and once to render.
+     * One automatic turn from a board the caller already holds: buy if the shop policy says so,
+     * else attempt the best-ranked ad, else wait if waiting can help, else take the least bad ad.
      */
     public TurnEvent playTurn(GameState state, Board board, long sequence) {
         if (state.isOver()) {
@@ -124,7 +109,7 @@ public final class GameOrchestrator {
                 .orElseGet(() -> TurnEvent.failed(sequence, state, "Message board was empty"));
     }
 
-    /** Manual mode: the human picked an ad, so no strategy filtering applies. */
+    /** Manual mode: the player picked an ad; no strategy filtering applies. */
     public TurnEvent solveById(GameState state, Board board, String adId, long sequence) {
         Ad ad = board.ads().stream()
                 .filter(candidate -> candidate.adId().equals(adId))
@@ -133,7 +118,7 @@ public final class GameOrchestrator {
         return solve(state, valuate(ad), sequence);
     }
 
-    /** Manual mode: the human picked an item. */
+    /** Manual mode: the player picked an item. */
     public TurnEvent buyById(GameState state, Board board, String itemId, long sequence) {
         ShopItem item = board.shop().stream()
                 .filter(candidate -> candidate.id().equals(itemId))
@@ -142,12 +127,7 @@ public final class GameOrchestrator {
         return buy(state, new ShopDecision.Buy(item, "Bought by hand"), sequence);
     }
 
-    /**
-     * Manual mode: the human chose to give up the turn rather than attempt anything.
-     *
-     * <p>Deliberately not subject to {@link WaitingPolicy}. The budget exists to stop an automatic
-     * run looping on a board that never improves; a person clicking the button has already decided.
-     */
+    /** Manual mode: the player gave up the turn. Not subject to {@link WaitingPolicy}'s budget, which exists to stop an automatic loop. */
     public TurnEvent waitOutTurn(GameState state, long sequence) {
         return idle(state, sequence, "Let the turn pass");
     }
@@ -174,16 +154,12 @@ public final class GameOrchestrator {
         return TurnEvent.bought(sequence, buy, result.success(), before, after);
     }
 
-    /**
-     * Spends the turn on a reputation read, which is the only call that costs a turn and risks
-     * nothing. The reason differs by who decided: the strategy explains itself, a person does not
-     * have to.
-     */
+    /** Spends the turn on a reputation read, the only call that costs a turn and risks nothing. */
     private TurnEvent idle(GameState before, long sequence, String reason) {
         Reputation reputation = api.investigateReputation(before.gameId());
         GameMemory memory = memories.update(before.gameId(), m -> m.afterIdling(reputation));
 
-        // The reputation call reports no state of its own, so the turn is advanced here.
+        // The reputation call reports no state, so the turn is advanced locally.
         GameState after = before.advanceTurn();
         String why = "%s - waited a turn (people %.1f, state %.1f, underworld %.1f)".formatted(
                 reason, reputation.people(), reputation.state(), reputation.underworld());
@@ -195,11 +171,7 @@ public final class GameOrchestrator {
         return TurnEvent.idled(sequence, why, before, after);
     }
 
-    /**
-     * The strategy dropped everything and waiting cannot help. There is no way to skip a turn, so
-     * take the single safest ad and hope. Losing here is better than the alternative, which is
-     * not moving at all.
-     */
+    /** The strategy refused everything and waiting cannot help; the safest ad on the board is the only move left. */
     private Optional<AdValuation> lastResort(List<Ad> ads, GameState state) {
         return ads.stream()
                 .filter(ad -> ad.risk().isKnown())
@@ -207,7 +179,7 @@ public final class GameOrchestrator {
                 .map(GameOrchestrator::valuate);
     }
 
-    /** For a hand-picked ad, or a last-resort one, there is no ranking to look the numbers up in. */
+    /** Valuation for an ad the strategy did not rank. */
     private static AdValuation valuate(Ad ad) {
         double chance = ad.risk().successRate();
         return new AdValuation(ad, chance, ad.reward() * chance, 1.0, ad.reward() * chance);

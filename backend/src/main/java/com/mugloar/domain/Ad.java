@@ -1,12 +1,10 @@
 package com.mugloar.domain;
 
 /**
- * A message from the board, already decoded and already mapped onto the risk scale.
+ * A message from the board, decoded and mapped onto the risk scale. {@code adId} is always the
+ * decoded id accepted by {@code /solve}.
  *
- * <p>Nothing downstream of the adapter ever sees an encoded ad, so {@code adId} here is always the
- * real id you can post to {@code /solve}.
- *
- * @param encoding kept only so the UI and the logs can show that an ad arrived obfuscated
+ * @param encoding retained so the UI and logs can show that an ad arrived encoded
  */
 public record Ad(
         String adId,

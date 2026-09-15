@@ -1,11 +1,17 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { TurnEvent } from '@/api/types'
+import type { BoardChange } from '@/stores/run'
 
-/** Feedback after a manual attempt, with the state change spelled out rather than implied. */
-const props = defineProps<{ event: TurnEvent }>()
+/** Feedback after a manual move, with the state change spelled out. */
+const props = defineProps<{
+  event: TurnEvent
+  boardChange: BoardChange | null
+  /** Turns until the soonest remaining notice expires. */
+  turnsUntilBoardChanges: number | null
+}>()
 
-/** Passing is neither a win nor a loss, so it gets its own tone rather than the success one. */
+/** Passing is neither a win nor a loss and gets a neutral tone. */
 const tone = computed(() => {
   if (props.event.action === 'IDLED') return 'neutral'
   return props.event.success ? 'good' : 'bad'
@@ -16,6 +22,25 @@ const headline = computed(() => {
   return props.event.apiMessage ?? (props.event.success ? 'That went well.' : 'That went badly.')
 })
 
+/**
+ * What the move did to the board. A pass replaces nothing by itself; it only ages every notice,
+ * so the board changes only when something expires. Saying so is what keeps a pass from looking
+ * like a no-op.
+ */
+const boardNote = computed(() => {
+  const change = props.boardChange
+  if (!change) return null
+  if (change.expired > 0 || change.arrived > 0) {
+    const gone = `${change.expired} ${change.expired === 1 ? 'notice' : 'notices'} left the board`
+    const came = change.arrived > 0 ? `, ${change.arrived} new` : ''
+    return `${gone}${came}.`
+  }
+  if (props.event.action !== 'IDLED') return null
+  if (props.turnsUntilBoardChanges === null) return 'The board is empty.'
+  const t = props.turnsUntilBoardChanges
+  return `Nothing expired. The board changes in ${t} ${t === 1 ? 'turn' : 'turns'}.`
+})
+
 const changes = computed(() => {
   const d = props.event.delta
   const parts: string[] = []
@@ -23,8 +48,7 @@ const changes = computed(() => {
   if (d.lives) parts.push(`${d.lives > 0 ? '+' : ''}${d.lives} ${Math.abs(d.lives) === 1 ? 'life' : 'lives'}`)
   if (d.score) parts.push(`+${d.score} score`)
   if (d.level) parts.push(`+${d.level} level`)
-  // A turn is only worth stating when it is the whole of what happened - which is the case for a
-  // pass, and would otherwise read as noise next to the gold and the score.
+  // The turn is stated only when it is the whole of what happened, as for a pass.
   if (parts.length === 0 && d.turn) parts.push(`+${d.turn} turn, nothing risked`)
   return parts
 })
@@ -35,6 +59,7 @@ const changes = computed(() => {
     <p class="result__headline">{{ headline }}</p>
     <p v-if="changes.length" class="result__changes numeral">{{ changes.join(' · ') }}</p>
     <p v-else class="result__changes">Nothing changed.</p>
+    <p v-if="boardNote" class="result__board">{{ boardNote }}</p>
   </div>
 </template>
 
@@ -67,6 +92,12 @@ const changes = computed(() => {
 }
 
 .result__changes {
+  color: var(--ink-soft);
+  font-size: 0.8125rem;
+}
+
+.result__board {
+  margin-top: 0.15rem;
   color: var(--ink-soft);
   font-size: 0.8125rem;
 }

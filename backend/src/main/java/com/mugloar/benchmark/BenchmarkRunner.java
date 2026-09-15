@@ -22,16 +22,9 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 /**
- * Plays N games headless and prints what actually happened.
- *
- * <p>Run it with {@code ./gradlew :backend:benchmark -Pgames=100}. It exists because "the strategy
- * feels better" is not a claim, and because comparing two strategies needs the same harness for
- * both.
- *
- * <p>Two separate throttles, because there are two separate limits. A semaphore caps how many games
- * are in flight, and a stagger caps how fast new ones start - Cloudflare answers a burst of
- * POST /game/start with "error code: 1015" and then ignores you for a while, which no retry budget
- * can outrun. Pacing the starts is the fix; retrying harder is not.
+ * Plays N games headless and reports score statistics ({@code ./gradlew :backend:benchmark
+ * -Pgames=100}). Two throttles apply: a semaphore caps games in flight, and a stagger paces game
+ * starts, because the upstream bans bursts of game starts for longer than any retry budget.
  */
 @Component
 @Profile("benchmark")
@@ -103,8 +96,7 @@ public class BenchmarkRunner implements CommandLineRunner {
             log.info("game {}/{} finished score={} turns={}",
                     gameNumber, properties.games(), state.score(), state.turn());
         } catch (MugloarApiException e) {
-            // A run killed by the upstream is not a zero. Recording it as one would flatter the
-            // average, so it goes in its own bucket and gets printed.
+            // A run killed by the upstream is reported separately rather than as a zero score.
             failures.add("game %d: %s".formatted(gameNumber, e.getMessage()));
             log.warn("game {}/{} aborted at score={} status={}",
                     gameNumber, properties.games(), state == null ? 0 : state.score(), e.status());
@@ -115,7 +107,7 @@ public class BenchmarkRunner implements CommandLineRunner {
         }
     }
 
-    /** Serialises game starts and spaces them out; everything after the start runs in parallel. */
+    /** Serialises and spaces out game starts; everything after the start runs in parallel. */
     private GameState staggeredStart() {
         startLock.lock();
         try {

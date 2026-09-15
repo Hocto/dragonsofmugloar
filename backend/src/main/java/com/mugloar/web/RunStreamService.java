@@ -11,11 +11,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
- * Turns a run's event history into an SSE stream.
- *
- * <p>Subscribers get every turn that already happened before they get live ones, which is what lets
- * the UI attach late, reconnect, or open a second tab and still see a coherent game. Events are
- * numbered, so the client can tell a replay from something new.
+ * Exposes a run's events as an SSE stream. Subscribers receive a replay of the history before live
+ * events, and events are numbered so the client can discard duplicates.
  */
 @Service
 public class RunStreamService {
@@ -38,14 +35,14 @@ public class RunStreamService {
                     emitter.complete();
                 }
             } catch (IOException | IllegalStateException e) {
-                // The browser went away mid-stream. Normal, and not worth a stack trace.
+                // The client disconnected mid-stream.
                 log.debug("stream.dropped gameId={} reason=\"{}\"", run.id(), e.getMessage());
                 emitter.completeWithError(e);
             }
         };
 
-        // Snapshot and subscribe together, so a turn recorded mid-subscription is replayed rather
-        // than dropped. Anything that lands in both is filtered by sequence number on the client.
+        // Snapshot and subscribe atomically; anything that lands in both is discarded by sequence
+        // number on the client.
         List<TurnEvent> history = run.replayAndSubscribe(listener);
         try {
             for (TurnEvent event : history) {

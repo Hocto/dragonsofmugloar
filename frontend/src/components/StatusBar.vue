@@ -1,10 +1,7 @@
 <script setup lang="ts">
 import type { GameState, StateDelta } from '@/api/types'
 
-/**
- * The HUD. It stays put while everything else changes, and it shows the delta from the last turn
- * next to each number so a change is legible without watching for it.
- */
+/** The HUD. Persistent, with the last turn's delta shown next to each number. */
 defineProps<{
   state: GameState
   delta: StateDelta | null
@@ -63,10 +60,7 @@ function sign(value: number): string {
       <p class="hud__mode">
         {{ mode === 'AUTO' ? `watching ${strategy}` : 'playing by hand' }}
       </p>
-      <!--
-        Always reachable, in both modes. An auto run keeps playing on the server after you leave;
-        the label says so rather than letting the button imply it stops anything.
-      -->
+      <!-- Reachable in both modes. An auto run keeps playing on the server after leaving; the label says so. -->
       <button
         type="button"
         class="hud__leave"

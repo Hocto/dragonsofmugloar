@@ -6,12 +6,8 @@ import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
- * CORS exists here for exactly one reason: {@code npm run dev} serves the UI from port 5173 while
- * the API is on 8080. In Docker nginx proxies /api to the backend, so the browser makes same-origin
- * requests and this configuration does nothing.
- *
- * <p>The origins are a config value rather than a wildcard so a deployed instance is not quietly
- * callable from anywhere.
+ * CORS for the development server, which serves the UI from a different port than the API. In
+ * Docker the UI is proxied same-origin and this configuration is inactive.
  */
 @Configuration
 public class WebConfiguration implements WebMvcConfigurer {

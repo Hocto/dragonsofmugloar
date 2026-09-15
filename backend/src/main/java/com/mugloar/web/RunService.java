@@ -12,10 +12,8 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 
 /**
- * The request/response surface for runs: start one, look at one, make a manual move on one.
- *
- * <p>Automatic play is {@link AutoPlayer}'s job. This class hands an auto run over and does not see
- * it again; a manual run it drives one call at a time.
+ * The request/response surface for runs: start, view, and manual moves. Automatic play is handed
+ * to {@link AutoPlayer}.
  */
 @Service
 public class RunService {
@@ -44,9 +42,8 @@ public class RunService {
 
     public RunView start(RunMode mode) {
         GameState state = orchestrator.start();
-        // The board is fetched before the run is registered. Registering first left a run in the
-        // registry as RUNNING with no player thread if this fetch threw - a zombie a later visit
-        // to the id would find and watch not move.
+        // The board is fetched before the run is registered, so a failed fetch leaves nothing
+        // behind in the registry.
         Board board = orchestrator.board(state);
         Run run = registry.register(state, mode, orchestrator.strategyName());
         run.record(TurnEvent.started(state));
@@ -61,13 +58,7 @@ public class RunService {
         return view(registry.require(runId));
     }
 
-    /**
-     * Manual turns are serialised per run.
-     *
-     * <p>The UI disables the board while a solve is in flight, but the API is reachable without the
-     * UI, and two turns racing would spend two turns off one board and interleave their state
-     * updates. One lock per run is cheap and there is only ever one player behind it.
-     */
+    /** Manual turns are serialised per run, so two concurrent requests cannot spend two turns off one board. */
     public TurnResultView solve(String runId, String adId) {
         Run run = registry.require(runId);
         synchronized (run) {
@@ -88,7 +79,7 @@ public class RunService {
         }
     }
 
-    /** The same move the strategy makes when the board is hopeless, available to a person too. */
+    /** Gives up the turn, the same move the strategy makes on a hopeless board. */
     public TurnResultView waitOutTurn(String runId) {
         Run run = registry.require(runId);
         synchronized (run) {
@@ -120,14 +111,7 @@ public class RunService {
         return mapper.toView(run, run.isRunning() ? board(run) : NO_BOARD);
     }
 
-    /**
-     * The board the run last acted on, fetched only if there is not one yet.
-     *
-     * <p>Nothing on the board moves between turns, so serving the cached copy is both cheaper and
-     * no less correct. It matters because an auto run redraws the board on every streamed turn, and
-     * refetching there would double this app's request rate into a per-IP limit for no new
-     * information.
-     */
+    /** The cached board, fetched only if absent. Nothing on it changes between turns, and the upstream rate limits per IP. */
     private Board board(Run run) {
         Board cached = run.board();
         if (cached != null) {

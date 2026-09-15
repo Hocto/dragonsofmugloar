@@ -7,11 +7,13 @@ import WaitTurnPanel from './WaitTurnPanel.vue'
 import TurnFeed from './TurnFeed.vue'
 import TurnResult from './TurnResult.vue'
 import type { RunView, TurnEvent } from '@/api/types'
+import type { BoardChange } from '@/stores/run'
 
 const props = defineProps<{
   run: RunView
   feed: TurnEvent[]
   lastEvent: TurnEvent | null
+  lastBoardChange: BoardChange | null
   pendingAdId: string | null
   pendingItemId: string | null
   canAct: boolean
@@ -23,18 +25,12 @@ const emit = defineEmits<{ solve: [adId: string]; buy: [itemId: string]; wait: [
 
 const isAuto = computed(() => props.run.mode === 'AUTO')
 
-/**
- * The strategy has refused every notice on the board, which is exactly when it waits. Derived here
- * rather than sent as its own field - the board already carries the per-ad verdict.
- */
+/** True when the strategy has refused every notice, which is when it would wait. Derived from the per-ad verdicts. */
 const nothingWorthAttempting = computed(
   () => props.run.ads.length > 0 && props.run.ads.every((ad) => ad.skippedByStrategy),
 )
 
-/**
- * How many turns until the soonest notice expires, which is the only way waiting changes anything.
- * Solving a quest replaces it immediately; waiting replaces nothing and only ages the board.
- */
+/** Turns until the soonest notice expires. Waiting replaces nothing on the board, so this is when it would change. */
 const turnsUntilBoardChanges = computed<number | null>(() =>
   props.run.ads.length > 0 ? Math.min(...props.run.ads.map((ad) => ad.expiresIn)) : null,
 )
@@ -52,9 +48,14 @@ const turnsUntilBoardChanges = computed<number | null>(() =>
 
     <main class="game__body">
       <div class="game__main">
-        <TurnResult v-if="!isAuto && lastEvent && lastEvent.action !== 'STARTED'" :event="lastEvent" />
+        <TurnResult
+          v-if="!isAuto && lastEvent && lastEvent.action !== 'STARTED'"
+          :event="lastEvent"
+          :board-change="lastBoardChange"
+          :turns-until-board-changes="turnsUntilBoardChanges"
+        />
 
-        <!-- Above the board: this is the move you need when the board is the problem. -->
+        <!-- Above the board so it is reachable when the board itself is the problem. -->
         <WaitTurnPanel
           v-if="!isAuto"
           :recommended="nothingWorthAttempting"

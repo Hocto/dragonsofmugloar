@@ -1,5 +1,5 @@
 package com.mugloar.web.dto;
 
-/** What the shop policy would do right now, and the sentence explaining it. */
+/** What the shop policy would do now, and why. */
 public record ShopAdviceView(String action, String itemId, String reason) {
 }

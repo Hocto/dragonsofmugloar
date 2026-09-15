@@ -2,12 +2,7 @@ import { computed } from 'vue'
 import { useRunStore } from '@/stores/run'
 import type { RunMode } from '@/api/types'
 
-/**
- * Run lifecycle for the screens: start one, retry a failed call, throw it away and go home.
- *
- * The store owns the state; this exists so components never import the store's action list
- * directly and so "start a run" is one call rather than three.
- */
+/** Run lifecycle for the screens: start, retry a failed call, abandon. The store owns the state. */
 export function useRun() {
   const store = useRunStore()
 

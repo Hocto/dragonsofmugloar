@@ -7,11 +7,9 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * The risk scale, ordered by measured success rate.
- *
- * <p>The API hands back a free-text probability label and never documents the set, so I logged
- * every attempt the bot made across a few dozen games and counted. Declaration order is the scale,
- * safest first, and {@code successRate} is the observed rate over roughly 440 attempts:
+ * The risk scale, ordered by measured success rate. The API sends a free-text probability label and
+ * does not document the set; declaration order is the scale, safest first, and {@code successRate}
+ * is the observed rate over roughly 440 logged attempts:
  *
  * <pre>
  *   Piece of cake       80/88   0.909
@@ -27,17 +25,9 @@ import java.util.stream.Stream;
  *   Impossible           0/16   0.000
  * </pre>
  *
- * <p>Two adjacent pairs came out the wrong way round from what the words suggest - "Gamble" beat
- * "Quite likely", and "Rather detrimental" beat "Playing with fire" - by margins well inside the
- * sampling noise at those counts. I left them where the measurement put them rather than tidying
- * them into the order intuition wanted, because I have data for one and a hunch for the other.
- *
- * <p>The bottom two are the important entry. "Suicide mission" went one for forty-four and
- * "Impossible" zero for sixteen, and those attempts cost a life each. They are not long shots, they
- * are a leak, which is what {@link #isWorthAttempting()} exists to stop.
- *
- * <p>I also tried making the rate a function of dragon level. It is not - see {@link Ad}'s reward
- * instead, and the README.
+ * <p>Two adjacent pairs ("Gamble"/"Quite likely", "Rather detrimental"/"Playing with fire") are
+ * within sampling noise of each other and are kept in measured order. Dragon level does not change
+ * the success rate; it scales the reward.
  */
 public enum RiskLevel {
     PIECE_OF_CAKE("Piece of cake", 0.91),
@@ -52,17 +42,10 @@ public enum RiskLevel {
     SUICIDE_MISSION("Suicide mission", 0.02),
     IMPOSSIBLE("Impossible", 0.00),
 
-    /**
-     * Anything the API invents that we have not seen before. Rated at zero so a new label can never
-     * look attractive, and so it fails {@link #isWorthAttempting()} like the hopeless ones do.
-     */
+    /** Any label not in the scale. Rated at zero so it is never attractive and never attempted. */
     UNKNOWN("", 0.00);
 
-    /**
-     * Below this, an attempt is a life thrown away. Set between "Playing with fire" at 0.31, which
-     * pays for itself on the high rewards a levelled dragon sees, and "Suicide mission" at 0.02,
-     * which never does.
-     */
+    /** Labels below this rate are never attempted; the cutoff separates 0.31 from 0.02. */
     private static final double WORTH_ATTEMPTING = 0.10;
 
     private static final Map<String, RiskLevel> BY_LABEL = Stream.of(values())
@@ -91,15 +74,12 @@ public enum RiskLevel {
         return this != UNKNOWN;
     }
 
-    /** False for the labels that have never meaningfully paid off, and for anything unrecognised. */
+    /** False for labels below the cutoff and for anything unrecognised. */
     public boolean isWorthAttempting() {
         return successRate >= WORTH_ATTEMPTING;
     }
 
-    /**
-     * Maps a wire label onto the scale. Unknown or missing labels fall back to {@link #UNKNOWN}
-     * rather than throwing, because a new label is a reason to play cautiously, not to crash a run.
-     */
+    /** Maps a wire label onto the scale; unknown or missing labels become {@link #UNKNOWN}. */
     public static RiskLevel fromLabel(String wireLabel) {
         return Optional.ofNullable(wireLabel)
                 .map(RiskLevel::normalise)
@@ -107,7 +87,7 @@ public enum RiskLevel {
                 .orElse(UNKNOWN);
     }
 
-    /** The API is inconsistent about trailing dots and casing ("Hmmm...." vs "Hmmm..."). */
+    /** Tolerates the API's inconsistent trailing dots and casing ("Hmmm...." vs "Hmmm..."). */
     private static String normalise(String raw) {
         return raw.strip().toLowerCase().replaceAll("\\.+$", "");
     }
