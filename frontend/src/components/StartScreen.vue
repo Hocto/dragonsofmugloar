@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { RunMode } from '@/api/types'
+import DragonOrnament from './DragonOrnament.vue'
 
 defineProps<{ starting: boolean }>()
 const emit = defineEmits<{ start: [mode: RunMode] }>()
@@ -7,9 +8,9 @@ const emit = defineEmits<{ start: [mode: RunMode] }>()
 
 <template>
   <main class="intro">
-    <!-- Decorative; the text carries everything, so it is hidden from assistive tech. -->
-    <div class="intro__art" aria-hidden="true" />
     <div class="intro__panel">
+    <!-- Decorative; the text carries everything, so it is hidden from assistive tech. -->
+    <div class="intro__art" aria-hidden="true"><DragonOrnament /></div>
     <h1 class="intro__title">Dragons of Mugloar</h1>
     <p class="intro__lede">
       The kingdom pins its problems to a board and pays whoever solves them. Some notices are
@@ -48,11 +49,6 @@ const emit = defineEmits<{ start: [mode: RunMode] }>()
 
     <p v-if="starting" class="intro__starting" role="status">Saddling up...</p>
     </div>
-
-    <p class="intro__credit">
-      Drawing by Nele Sergejeva, © 2018 Bigbank AS, from
-      <a href="https://dragonsofmugloar.com" rel="noopener">dragonsofmugloar.com</a>.
-    </p>
   </main>
 </template>
 
@@ -61,50 +57,42 @@ const emit = defineEmits<{ start: [mode: RunMode] }>()
   position: relative;
   min-height: 100vh;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: var(--gap-4) var(--gap-3);
+  padding: clamp(var(--gap-4), 7vh, 4.5rem) var(--gap-3) var(--gap-4);
 }
 
 /*
- * The site's own dragon sketch, full bleed. Covering the viewport crops the parchment's torn edge,
- * so it reads as the paper the page is printed on rather than a sheet pinned to it. Positioned so
- * the dragon sits left of centre, where the panel leaves it visible on wide screens.
+ * A dragon in ink wash, low in the left of the viewport. Fixed so it stays put when the panel
+ * scrolls on short screens, and faint enough behind the text that both schemes keep their contrast.
  */
 .intro__art {
   position: fixed;
-  inset: 0;
-  /* Imported from src/assets so Vite fingerprints it into /assets/, where nginx's immutable cache rule applies. */
-  background: url('../assets/art/dragon-in-barn.webp') no-repeat 20% 60% / cover;
+  left: 2vw;
+  bottom: 1vh;
+  width: min(64vw, 32rem);
+  opacity: 0.12;
   z-index: -1;
+  pointer-events: none;
 }
 
 /* Wide screens: the panel keeps to the right so the dragon on the left stays in view. */
 @media (min-width: 64rem) {
   .intro {
+    align-items: center;
     justify-content: flex-end;
     padding-right: clamp(var(--gap-4), 8vw, 8rem);
   }
 
   .intro__art {
-    background-position: 0% 55%;
+    left: 1vw;
+    bottom: 12vh;
+    width: min(58vw, 56rem);
+    opacity: 0.18;
   }
 }
 
-/* Dark scheme: the parchment stays lit but sits under a warm scrim so the panel can hold cream text. */
-@media (prefers-color-scheme: dark) {
-  .intro__art::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: rgba(23, 19, 15, 0.62);
-  }
-}
-
-/*
- * The text on a translucent notice over the sketch. Enough paper behind the type to keep contrast
- * wherever the drawing lands, little enough that the drawing shows through at the edges.
- */
+/* The panel is a sheet laid over the page, translucent enough for the drawing to show at its edges. */
 .intro__panel {
   width: 100%;
   max-width: 38rem;
@@ -115,7 +103,7 @@ const emit = defineEmits<{ start: [mode: RunMode] }>()
   background: rgba(247, 240, 224, 0.86);
   border: 1px solid var(--paper-edge);
   border-radius: var(--radius);
-  backdrop-filter: blur(2px);
+  box-shadow: var(--shadow);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -134,10 +122,12 @@ const emit = defineEmits<{ start: [mode: RunMode] }>()
     padding: var(--gap-3);
   }
 
+  /* No room beside the panel, so the dragon becomes a small emblem above the title instead. */
   .intro__art {
-    /* A narrow viewport shows a fraction of the sheet; the 900px file is plenty and half the bytes. */
-    background-image: url('../assets/art/dragon-in-barn-900.webp');
-    background-position: 30% 70%;
+    position: static;
+    width: 62%;
+    margin: 0 auto calc(-1 * var(--gap-2));
+    opacity: 0.55;
   }
 }
 
@@ -196,28 +186,5 @@ const emit = defineEmits<{ start: [mode: RunMode] }>()
   text-align: center;
   font-style: italic;
   color: var(--ink-faint);
-}
-
-/* The sketch is the site's own artwork; the credit stays on screen wherever the sketch is. */
-.intro__credit {
-  position: fixed;
-  left: var(--gap-3);
-  bottom: var(--gap-2);
-  margin: 0;
-  padding: 0.2rem 0.5rem;
-  font-size: 0.6875rem;
-  color: var(--ink-soft);
-  background: rgba(247, 240, 224, 0.75);
-  border-radius: var(--radius);
-}
-
-.intro__credit a {
-  color: inherit;
-}
-
-@media (prefers-color-scheme: dark) {
-  .intro__credit {
-    background: rgba(34, 28, 22, 0.75);
-  }
 }
 </style>
