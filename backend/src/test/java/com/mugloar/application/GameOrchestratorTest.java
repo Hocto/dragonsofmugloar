@@ -27,13 +27,17 @@ class GameOrchestratorTest {
             new ShopItem("hpot", "Healing potion", 50),
             new ShopItem("cs", "Claw Sharpening", 100));
 
+    /** One store per test, so a test can look at what the orchestrator remembered. */
+    private final GameMemories memories = new GameMemories();
+
     private GameOrchestrator orchestratorFor(FakeMugloarApi api) {
         return orchestratorFor(api, 20);
     }
 
     private GameOrchestrator orchestratorFor(FakeMugloarApi api, int maxIdleTurns) {
         return new GameOrchestrator(
-                api, new ExpectedValueStrategy(1.6), new ShopPolicy(2, 50), maxIdleTurns);
+                api, new ExpectedValueStrategy(1.6), new ShopPolicy(2, 50),
+                new WaitingPolicy(maxIdleTurns), memories);
     }
 
     @Test
@@ -209,10 +213,10 @@ class GameOrchestratorTest {
         GameOrchestrator orchestrator = orchestratorFor(api);
         GameState current = state(1, 0, 0);
 
-        assertThat(orchestrator.reputationFor(current.gameId())).isEmpty();
+        assertThat(memories.reputationOf(current.gameId())).isEmpty();
         orchestrator.playTurn(current, 1);
 
-        assertThat(orchestrator.reputationFor(current.gameId())).contains(Reputation.NEUTRAL);
+        assertThat(memories.reputationOf(current.gameId())).contains(Reputation.NEUTRAL);
     }
 
     @Test
@@ -380,7 +384,7 @@ class GameOrchestratorTest {
 
         GameState current = state(5, 0, 0);
         current = orchestrator.playTurn(current, 1).state();
-        orchestrator.forget(current.gameId());
+        memories.forget(current.gameId());
         orchestrator.playTurn(current, 2);
 
         assertThat(api.calls()).filteredOn("shop"::equals).hasSize(2);

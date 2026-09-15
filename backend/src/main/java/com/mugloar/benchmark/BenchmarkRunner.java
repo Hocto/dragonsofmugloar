@@ -1,5 +1,6 @@
 package com.mugloar.benchmark;
 
+import com.mugloar.application.GameMemories;
 import com.mugloar.application.GameOrchestrator;
 import com.mugloar.application.TurnEvent;
 import com.mugloar.application.port.MugloarApiException;
@@ -39,12 +40,15 @@ public class BenchmarkRunner implements CommandLineRunner {
     private static final Logger log = LoggerFactory.getLogger(BenchmarkRunner.class);
 
     private final GameOrchestrator orchestrator;
+    private final GameMemories memories;
     private final BenchmarkProperties properties;
     private final ReentrantLock startLock = new ReentrantLock();
     private volatile long nextStartAllowedAt;
 
-    public BenchmarkRunner(GameOrchestrator orchestrator, BenchmarkProperties properties) {
+    public BenchmarkRunner(
+            GameOrchestrator orchestrator, GameMemories memories, BenchmarkProperties properties) {
         this.orchestrator = orchestrator;
+        this.memories = memories;
         this.properties = properties;
     }
 
@@ -106,7 +110,7 @@ public class BenchmarkRunner implements CommandLineRunner {
                     gameNumber, properties.games(), state == null ? 0 : state.score(), e.status());
         } finally {
             if (state != null) {
-                orchestrator.forget(state.gameId());
+                memories.forget(state.gameId());
             }
         }
     }

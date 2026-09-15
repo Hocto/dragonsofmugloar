@@ -1,5 +1,6 @@
 package com.mugloar.web;
 
+import com.mugloar.application.GameMemories;
 import com.mugloar.domain.GameState;
 import java.util.Comparator;
 import java.util.List;
@@ -18,7 +19,9 @@ import org.springframework.stereotype.Component;
  * everything and a second instance would not see the first one's runs - fine for a single container,
  * and the first thing I would replace if this ever ran more than once (see the README).
  *
- * <p>The cap stops a long-lived container from holding every game anyone ever played.
+ * <p>The cap stops a long-lived container from holding every game anyone ever played. When it
+ * bites, the run's game memory goes with it - otherwise an abandoned manual run, which never
+ * reaches the code that would normally forget it, would leave an entry behind for good.
  */
 @Component
 public class RunRegistry {
@@ -26,9 +29,11 @@ public class RunRegistry {
     private static final Logger log = LoggerFactory.getLogger(RunRegistry.class);
 
     private final ConcurrentMap<String, Run> runs = new ConcurrentHashMap<>();
+    private final GameMemories memories;
     private final int maxRuns;
 
-    public RunRegistry(WebProperties properties) {
+    public RunRegistry(GameMemories memories, WebProperties properties) {
+        this.memories = memories;
         this.maxRuns = properties.maxRuns();
     }
 
@@ -58,6 +63,7 @@ public class RunRegistry {
         int toDrop = runs.size() - maxRuns + 1;
         candidates.stream().limit(toDrop).forEach(run -> {
             runs.remove(run.id());
+            memories.forget(run.id());
             log.info("run.evicted gameId={} status={}", run.id(), run.status());
         });
     }

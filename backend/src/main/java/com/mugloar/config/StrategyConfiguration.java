@@ -1,7 +1,9 @@
 package com.mugloar.config;
 
+import com.mugloar.application.GameMemories;
 import com.mugloar.application.GameOrchestrator;
 import com.mugloar.application.ShopPolicy;
+import com.mugloar.application.WaitingPolicy;
 import com.mugloar.application.port.MugloarApi;
 import com.mugloar.application.strategy.AdSelectionStrategy;
 import com.mugloar.application.strategy.ExpectedValueStrategy;
@@ -42,11 +44,23 @@ public class StrategyConfiguration {
     }
 
     @Bean
+    WaitingPolicy waitingPolicy(StrategyProperties properties) {
+        return new WaitingPolicy(properties.maxIdleTurns());
+    }
+
+    /** One store shared by the web layer, the auto player and the benchmark. */
+    @Bean
+    GameMemories gameMemories() {
+        return new GameMemories();
+    }
+
+    @Bean
     GameOrchestrator gameOrchestrator(
             MugloarApi api,
             AdSelectionStrategy strategy,
             ShopPolicy shopPolicy,
-            StrategyProperties properties) {
-        return new GameOrchestrator(api, strategy, shopPolicy, properties.maxIdleTurns());
+            WaitingPolicy waitingPolicy,
+            GameMemories memories) {
+        return new GameOrchestrator(api, strategy, shopPolicy, waitingPolicy, memories);
     }
 }

@@ -1,52 +1,45 @@
 package com.mugloar.web;
 
 import com.mugloar.application.Board;
+import com.mugloar.application.GameMemories;
 import com.mugloar.application.GameOrchestrator;
 import com.mugloar.application.ShopDecision;
 import com.mugloar.application.TurnEvent;
-import com.mugloar.application.port.MugloarApiException;
 import com.mugloar.domain.GameState;
 import com.mugloar.web.dto.RunView;
 import com.mugloar.web.dto.TurnResultView;
-import java.time.Duration;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 /**
- * Run lifecycle for the frontend.
+ * The request/response surface for runs: start one, look at one, make a manual move on one.
  *
- * <p>An auto run gets its own thread and keeps playing whether or not anyone is watching, so
- * closing the tab does not abandon a game halfway and reopening it replays the whole thing. The
- * threads are virtual, so "one per run" is not a number worth worrying about - they spend their
- * lives blocked on Mugloar.
+ * <p>Automatic play is {@link AutoPlayer}'s job. This class hands an auto run over and does not see
+ * it again; a manual run it drives one call at a time.
  */
 @Service
 public class RunService {
-
-    private static final Logger log = LoggerFactory.getLogger(RunService.class);
 
     private static final Board NO_BOARD =
             new Board(List.of(), List.of(), List.of(), new ShopDecision.Skip("Run is over"));
 
     private final GameOrchestrator orchestrator;
+    private final GameMemories memories;
+    private final AutoPlayer autoPlayer;
     private final RunRegistry registry;
     private final RunViewMapper mapper;
-    private final Duration autoTurnDelay;
-    private final ExecutorService runners = Executors.newVirtualThreadPerTaskExecutor();
 
     public RunService(
             GameOrchestrator orchestrator,
+            GameMemories memories,
+            AutoPlayer autoPlayer,
             RunRegistry registry,
-            RunViewMapper mapper,
-            WebProperties webProperties) {
+            RunViewMapper mapper) {
         this.orchestrator = orchestrator;
+        this.memories = memories;
+        this.autoPlayer = autoPlayer;
         this.registry = registry;
         this.mapper = mapper;
-        this.autoTurnDelay = webProperties.autoTurnDelay();
     }
 
     public RunView start(RunMode mode) {
@@ -55,7 +48,7 @@ public class RunService {
         run.record(TurnEvent.started(state));
         run.board(orchestrator.board(state));
         if (mode == RunMode.AUTO) {
-            runners.submit(() -> playToTheEnd(run));
+            autoPlayer.play(run);
         }
         return view(run);
     }
@@ -106,9 +99,16 @@ public class RunService {
 
     private TurnResultView afterManualTurn(Run run, TurnEvent event) {
         run.record(event);
-        orchestrator.reputationFor(run.id()).ifPresent(run::reputation);
-        finishIfDead(run);
-        run.board(run.isRunning() ? orchestrator.board(run.state()) : null);
+        memories.reputationOf(run.id()).ifPresent(run::reputation);
+        if (run.state().isOver() && run.isRunning()) {
+            run.record(TurnEvent.finished(run.nextSequence(), run.state(), "Out of lives"));
+        }
+        if (run.isRunning()) {
+            run.board(orchestrator.board(run.state()));
+        } else {
+            run.board(null);
+            memories.forget(run.id());
+        }
         return new TurnResultView(event, view(run));
     }
 
@@ -141,51 +141,6 @@ public class RunService {
         }
         if (!run.isRunning()) {
             throw new IllegalStateException("Run " + run.id() + " is already over");
-        }
-    }
-
-    private void playToTheEnd(Run run) {
-        try {
-            while (run.isRunning() && !run.state().isOver()) {
-                Board board = orchestrator.board(run.state());
-                run.board(board);
-                run.record(orchestrator.playTurn(run.state(), board, run.nextSequence()));
-                // Reputation is only ever read while waiting out a bad board, so this picks it up
-                // whenever that has happened and leaves it null otherwise.
-                orchestrator.reputationFor(run.id()).ifPresent(run::reputation);
-                pause();
-            }
-            if (run.isRunning()) {
-                run.record(TurnEvent.finished(run.nextSequence(), run.state(), "Out of lives"));
-            }
-            log.info("run.finished gameId={} score={} turns={} strategy={}",
-                    run.id(), run.state().score(), run.state().turn(), run.strategy());
-        } catch (MugloarApiException e) {
-            log.warn("run.failed gameId={} status={} reason=\"{}\"", run.id(), e.status(), e.getMessage());
-            run.record(TurnEvent.failed(run.nextSequence(), run.state(), e.getMessage()));
-        } catch (RuntimeException e) {
-            log.error("run.crashed gameId={}", run.id(), e);
-            run.record(TurnEvent.failed(run.nextSequence(), run.state(), e.toString()));
-        } finally {
-            orchestrator.forget(run.id());
-            run.board(null);
-        }
-    }
-
-    private void finishIfDead(Run run) {
-        if (run.state().isOver() && run.isRunning()) {
-            run.record(TurnEvent.finished(run.nextSequence(), run.state(), "Out of lives"));
-        }
-    }
-
-    private void pause() {
-        if (autoTurnDelay.isZero() || autoTurnDelay.isNegative()) {
-            return;
-        }
-        try {
-            Thread.sleep(autoTurnDelay.toMillis());
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
         }
     }
 }
