@@ -19,5 +19,7 @@ public record RunView(
         ShopAdviceView shopAdvice,
         /** The most recent events only; {@code summary} counts over all of them. */
         List<TurnEvent> events,
-        RunSummary summary) {
+        RunSummary summary,
+        /** Turns this game may still spend waiting. Shared with the strategy's budget. */
+        int waitTurnsRemaining) {
 }

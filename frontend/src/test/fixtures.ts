@@ -40,6 +40,7 @@ export function runView(over: Partial<RunView> = {}): RunView {
     shopAdvice: { action: 'SKIP', itemId: null, reason: 'nothing worth buying at 40 gold' },
     events: [],
     summary: { solved: 0, failed: 0, bought: 0, idled: 0 },
+    waitTurnsRemaining: 10,
     ...over,
   }
 }

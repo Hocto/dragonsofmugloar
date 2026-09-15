@@ -27,7 +27,7 @@ public class RunViewMapper {
 
     private static final int MAX_EVENTS_IN_VIEW = 60;
 
-    public RunView toView(Run run, Board board) {
+    public RunView toView(Run run, Board board, int waitTurnsRemaining) {
         Map<String, AdValuation> scored = board.ranked().stream()
                 .collect(Collectors.toMap(v -> v.ad().adId(), Function.identity(), (a, b) -> a));
         String bestAdId = board.ranked().stream().findFirst().map(v -> v.ad().adId()).orElse(null);
@@ -60,7 +60,8 @@ public class RunViewMapper {
                 shop,
                 toAdvice(board.shopRecommendation()),
                 events,
-                run.summary());
+                run.summary(),
+                waitTurnsRemaining);
     }
 
     private AdView toAdView(Ad ad, AdValuation valuation, boolean recommended) {

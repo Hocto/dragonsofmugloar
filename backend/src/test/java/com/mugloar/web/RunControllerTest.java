@@ -285,6 +285,7 @@ class RunControllerTest {
                 List.of(new ShopItemView("hpot", "Healing potion", 50, false, true, false)),
                 new ShopAdviceView("SKIP", null, "nothing worth buying at 20 gold"),
                 List.of(),
-                new RunSummary(0, 0, 0, 0));
+                new RunSummary(0, 0, 0, 0),
+                10);
     }
 }

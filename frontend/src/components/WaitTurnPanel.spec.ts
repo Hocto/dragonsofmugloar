@@ -13,6 +13,7 @@ function mountPanel(props: Partial<InstanceType<typeof WaitTurnPanel>['$props']>
       pending: false,
       disabled: false,
       turnsUntilBoardChanges: 3,
+      turnsRemaining: 10,
       ...props,
     },
   })
@@ -33,11 +34,39 @@ describe('WaitTurnPanel', () => {
   })
 
   it('explains why the board changes at all', () => {
-    expect(mountPanel().text()).toContain('The board changes when a notice expires')
+    expect(mountPanel().text()).toContain('the board changes when a notice expires')
   })
 
   it('offers a single turn when the board is empty', () => {
     expect(mountPanel({ turnsUntilBoardChanges: null }).get('button').text()).toBe('Wait 1 turn for a new board')
+  })
+
+  it('shows how many waiting turns the game has left', () => {
+    expect(mountPanel({ turnsRemaining: 4 }).text()).toContain('4 waiting turns left this game')
+    expect(mountPanel({ turnsRemaining: 1, turnsUntilBoardChanges: 1 }).text()).toContain('1 waiting turn left this game')
+  })
+
+  it('disables the button and says why when the budget is spent', () => {
+    const panel = mountPanel({ turnsRemaining: 0 })
+
+    expect(panel.get('button').attributes('disabled')).toBeDefined()
+    expect(panel.text()).toContain('No waiting turns left this game')
+    expect(panel.get('button').attributes('aria-label')).toContain('Cannot wait')
+  })
+
+  it('disables the button when the budget cannot see the board through', () => {
+    // Three turns left, board needs five. Spending the three would leave the same board.
+    const panel = mountPanel({ turnsRemaining: 3, turnsUntilBoardChanges: 5 })
+
+    expect(panel.get('button').attributes('disabled')).toBeDefined()
+    expect(panel.text()).toContain('Only 3 waiting turns left; this board needs 5')
+  })
+
+  it('does not urge a wait it would then refuse', () => {
+    const panel = mountPanel({ recommended: true, turnsRemaining: 0 })
+
+    expect(panel.classes()).not.toContain('wait--urged')
+    expect(panel.text()).not.toContain('Nothing here is worth the risk')
   })
 
   it('keeps to one row in both states so it does not resize as the board changes', () => {

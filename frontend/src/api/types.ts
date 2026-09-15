@@ -100,6 +100,8 @@ export interface RunView {
   /** Most recent only; `summary` counts over all of them. */
   events: TurnEvent[]
   summary: RunSummary
+  /** Turns this game may still spend waiting. Shared with the strategy's budget. */
+  waitTurnsRemaining: number
 }
 
 export interface TurnResultView {

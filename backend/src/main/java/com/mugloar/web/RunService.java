@@ -5,6 +5,7 @@ import com.mugloar.application.GameMemories;
 import com.mugloar.application.GameOrchestrator;
 import com.mugloar.application.ShopDecision;
 import com.mugloar.application.TurnEvent;
+import com.mugloar.application.WaitingPolicy;
 import com.mugloar.domain.Ad;
 import com.mugloar.domain.GameState;
 import com.mugloar.web.dto.RunView;
@@ -29,6 +30,7 @@ public class RunService {
 
     private final GameOrchestrator orchestrator;
     private final GameMemories memories;
+    private final WaitingPolicy waitingPolicy;
     private final AutoPlayer autoPlayer;
     private final RunRegistry registry;
     private final RunViewMapper mapper;
@@ -36,11 +38,13 @@ public class RunService {
     public RunService(
             GameOrchestrator orchestrator,
             GameMemories memories,
+            WaitingPolicy waitingPolicy,
             AutoPlayer autoPlayer,
             RunRegistry registry,
             RunViewMapper mapper) {
         this.orchestrator = orchestrator;
         this.memories = memories;
+        this.waitingPolicy = waitingPolicy;
         this.autoPlayer = autoPlayer;
         this.registry = registry;
         this.mapper = mapper;
@@ -89,14 +93,26 @@ public class RunService {
      * Passes turns until the board changes. A single pass replaces nothing on the board; it only
      * ages every notice by one turn, so waiting is only meaningful once something expires. Each
      * turn is recorded as its own event, and a failure part-way leaves the turns already spent.
+     * The per-game waiting budget applies to the player exactly as it does to the strategy:
+     * a wait the remaining budget cannot see through is refused rather than half-spent.
      */
     public TurnResultView waitForBoardToChange(String runId) {
         Run run = registry.require(runId);
         synchronized (run) {
             requireManualAndRunning(run);
-            Set<String> before = adIds(board(run));
+            Board current = board(run);
+            int remaining = waitTurnsRemaining(run);
+            if (!waitingPolicy.canAffordToWait(current, memories.of(run.id()))) {
+                throw new IllegalStateException(remaining <= 0
+                        ? "No waiting turns left this game"
+                        : "Only %d waiting %s left this game; the board needs %d".formatted(
+                                remaining, remaining == 1 ? "turn" : "turns",
+                                WaitingPolicy.turnsUntilBoardChanges(current)));
+            }
+            Set<String> before = adIds(current);
             TurnEvent last = null;
-            for (int turn = 0; turn < MAX_WAIT_TURNS && run.isRunning(); turn++) {
+            int cap = Math.min(MAX_WAIT_TURNS, remaining);
+            for (int turn = 0; turn < cap && run.isRunning(); turn++) {
                 last = orchestrator.waitOutTurn(run.state(), run.nextSequence());
                 run.record(last);
                 memories.reputationOf(run.id()).ifPresent(run::reputation);
@@ -134,7 +150,11 @@ public class RunService {
     }
 
     private RunView view(Run run) {
-        return mapper.toView(run, run.isRunning() ? board(run) : NO_BOARD);
+        return mapper.toView(run, run.isRunning() ? board(run) : NO_BOARD, waitTurnsRemaining(run));
+    }
+
+    private int waitTurnsRemaining(Run run) {
+        return Math.max(0, waitingPolicy.remainingBudget(memories.of(run.id())));
     }
 
     /** The cached board, fetched only if absent. Nothing on it changes between turns, and the upstream rate limits per IP. */

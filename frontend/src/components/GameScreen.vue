@@ -62,6 +62,7 @@ const turnsUntilBoardChanges = computed<number | null>(() =>
           :pending="busy && !pendingAdId && !pendingItemId"
           :disabled="busy || !canAct"
           :turns-until-board-changes="turnsUntilBoardChanges"
+          :turns-remaining="run.waitTurnsRemaining"
           @wait="emit('wait')"
         />
 

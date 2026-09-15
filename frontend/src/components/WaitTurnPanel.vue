@@ -13,38 +13,51 @@ const props = defineProps<{
   disabled: boolean
   /** Turns until the soonest notice expires and is replaced. Null when the board is empty. */
   turnsUntilBoardChanges: number | null
+  /** Turns this game may still spend waiting. */
+  turnsRemaining: number
 }>()
 
 const emit = defineEmits<{ wait: [] }>()
 
 const turns = computed(() => props.turnsUntilBoardChanges ?? 1)
+const plural = (n: number) => (n === 1 ? 'turn' : 'turns')
+
+/** Refused for the same reason the strategy refuses: a wait the budget cannot see through. */
+const unaffordable = computed(() => props.turnsRemaining <= 0 || turns.value > props.turnsRemaining)
+
+const budgetNote = computed(() => {
+  if (props.turnsRemaining <= 0) return 'No waiting turns left this game.'
+  if (unaffordable.value)
+    return `Only ${props.turnsRemaining} waiting ${plural(props.turnsRemaining)} left; this board needs ${turns.value}.`
+  return `${props.turnsRemaining} waiting ${plural(props.turnsRemaining)} left this game.`
+})
+
 const label = computed(() =>
-  props.pending
-    ? 'Waiting...'
-    : `Wait ${turns.value} ${turns.value === 1 ? 'turn' : 'turns'} for a new board`,
+  props.pending ? 'Waiting...' : `Wait ${turns.value} ${plural(turns.value)} for a new board`,
 )
-const ariaLabel = computed(
-  () =>
-    `Wait ${turns.value} ${turns.value === 1 ? 'turn' : 'turns'} until the board changes, without attempting a quest. Costs ${turns.value} ${turns.value === 1 ? 'turn' : 'turns'} and risks no lives.`,
+const ariaLabel = computed(() =>
+  unaffordable.value
+    ? `Cannot wait: ${budgetNote.value}`
+    : `Wait ${turns.value} ${plural(turns.value)} until the board changes, without attempting a quest. Costs ${turns.value} ${plural(turns.value)} and risks no lives. ${budgetNote.value}`,
 )
 </script>
 
 <template>
-  <section class="wait" :class="{ 'wait--urged': recommended }" aria-labelledby="wait-heading">
+  <section class="wait" :class="{ 'wait--urged': recommended && !unaffordable }" aria-labelledby="wait-heading">
     <p class="wait__copy">
       <span id="wait-heading" class="wait__heading">Sit this board out</span>
       <span class="wait__body">
-        <template v-if="recommended">Nothing here is worth the risk.</template>
-        <template v-else>Risks nothing.</template>
-        The board changes when a notice expires.
+        <template v-if="recommended && !unaffordable">Nothing here is worth the risk.</template>
+        <template v-else-if="!unaffordable">Risks nothing; the board changes when a notice expires.</template>
+        <span :class="{ 'wait__budget--out': unaffordable }">{{ budgetNote }}</span>
       </span>
     </p>
 
     <button
       type="button"
       class="seal wait__action"
-      :class="{ 'seal--primary': recommended }"
-      :disabled="disabled || pending"
+      :class="{ 'seal--primary': recommended && !unaffordable }"
+      :disabled="disabled || pending || unaffordable"
       :aria-label="ariaLabel"
       @click="emit('wait')"
     >
@@ -92,6 +105,11 @@ const ariaLabel = computed(
 }
 
 .wait--urged .wait__body {
+  color: var(--wax);
+  font-weight: 600;
+}
+
+.wait__budget--out {
   color: var(--wax);
   font-weight: 600;
 }

@@ -27,18 +27,20 @@ public final class WaitingPolicy {
         return maxIdleTurns - memory.idlesUsed();
     }
 
+    /** Turns until the soonest notice expires; zero for an empty board. */
+    public static int turnsUntilBoardChanges(Board board) {
+        return board.ads().stream().mapToInt(Ad::expiresIn).min().orElse(0);
+    }
+
+    /** Whether the remaining budget covers the turns the board needs. Applies to the bot and the player alike. */
+    public boolean canAffordToWait(Board board, GameMemory memory) {
+        int remaining = remainingBudget(memory);
+        return remaining > 0 && turnsUntilBoardChanges(board) <= remaining;
+    }
+
     /** The reason to wait this turn, or empty. Consulted only after the strategy and shop policy have both declined. */
     public Optional<String> reasonToWait(GameState state, Board board, GameMemory memory) {
-        int remaining = remainingBudget(memory);
-        if (remaining <= 0) {
-            return Optional.empty();
-        }
-        int turnsUntilBoardChanges = board.ads().stream()
-                .mapToInt(Ad::expiresIn)
-                .min()
-                // An empty board has nothing to wait out, but nothing to attempt either.
-                .orElse(0);
-        if (turnsUntilBoardChanges > remaining) {
+        if (!canAffordToWait(board, memory)) {
             return Optional.empty();
         }
         return Optional.of("Nothing worth attempting at %d %s"
