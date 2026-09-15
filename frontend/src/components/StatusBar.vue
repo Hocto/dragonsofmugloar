@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { GameState, StateDelta } from '@/api/types'
+import { TARGET_SCORE } from '@/game'
 
 /** The HUD. Persistent, with the last turn's delta shown next to each number. */
-defineProps<{
+const props = defineProps<{
   state: GameState
   delta: StateDelta | null
   strategy: string
@@ -10,6 +12,10 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{ leave: [] }>()
+
+/** Shown once the score has crossed the target. The run does not stop; this only marks it. */
+const cleared = computed(() => props.state.score >= TARGET_SCORE)
+const targetLabel = TARGET_SCORE.toLocaleString('en-GB')
 
 function sign(value: number): string {
   return value > 0 ? `+${value}` : `${value}`
@@ -42,6 +48,7 @@ function sign(value: number): string {
         <dd class="numeral hud__value--score">
           {{ state.score }}
           <span v-if="delta?.score" class="hud__delta up">{{ sign(delta.score) }}</span>
+          <span v-if="cleared" class="hud__cleared">cleared {{ targetLabel }}</span>
         </dd>
       </div>
       <div class="hud__stat">
@@ -139,6 +146,19 @@ function sign(value: number): string {
 
 .hud__delta.down {
   color: var(--wax);
+}
+
+/* A word, not a colour change alone, so the milestone reads without the green. */
+.hud__cleared {
+  font-family: var(--body);
+  font-size: 0.625rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--moss);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 0 0.4rem;
+  line-height: 1.5;
 }
 
 .hud__side {

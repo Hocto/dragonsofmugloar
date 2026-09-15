@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { RunView } from '@/api/types'
+import { TARGET_SCORE } from '@/game'
 
 const props = defineProps<{ run: RunView }>()
 const emit = defineEmits<{ restart: [] }>()
@@ -10,6 +11,8 @@ const solved = computed(() => props.run.summary.solved)
 const failed = computed(() => props.run.summary.failed)
 const bought = computed(() => props.run.summary.bought)
 const brokeOff = computed(() => props.run.status === 'FAILED')
+const cleared = computed(() => props.run.state.score >= TARGET_SCORE)
+const targetLabel = TARGET_SCORE.toLocaleString('en-GB')
 </script>
 
 <template>
@@ -33,7 +36,7 @@ const brokeOff = computed(() => props.run.status === 'FAILED')
     </dl>
 
     <p class="over__verdict">
-      {{ run.state.score >= 1000 ? 'Cleared the thousand.' : 'Short of a thousand this time.' }}
+      {{ cleared ? `Cleared ${targetLabel}.` : `Short of ${targetLabel} this time.` }}
     </p>
 
     <button type="button" class="seal seal--primary" @click="emit('restart')">
