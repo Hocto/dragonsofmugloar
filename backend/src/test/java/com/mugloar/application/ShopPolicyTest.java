@@ -74,6 +74,16 @@ class ShopPolicyTest {
     }
 
     @Test
+    void aHighReserveHoldsOffUpgradesEvenWithAPotionInTheShop() {
+        // The reserve used to apply only when the shop had no potion, which it always does, so the
+        // setting did nothing. It is now a floor on top of the potion price.
+        ShopPolicy hoarder = new ShopPolicy(2, 9999);
+
+        assertThat(hoarder.decide(state(5, 2000, 0), SHOP)).isInstanceOf(ShopDecision.Skip.class);
+        assertThat(new ShopPolicy(2, 50).decide(state(5, 2000, 0), SHOP)).isInstanceOf(ShopDecision.Buy.class);
+    }
+
+    @Test
     void neverBuysSomethingItCannotPayFor() {
         // A failed purchase still burns a turn, so an unaffordable Buy would be a real bug.
         for (int gold = 0; gold <= 400; gold += 7) {

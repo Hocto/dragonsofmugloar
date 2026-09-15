@@ -22,7 +22,7 @@ public final class ShopPolicy {
 
     /**
      * @param healingThresholdLives buy a potion at or below this many lives
-     * @param upgradeGoldReserve    gold to keep back after an upgrade, so a potion stays affordable
+     * @param upgradeGoldReserve    minimum gold to keep back after an upgrade; never less than a potion's price
      */
     public ShopPolicy(int healingThresholdLives, int upgradeGoldReserve) {
         this.healingThresholdLives = healingThresholdLives;
@@ -44,7 +44,8 @@ public final class ShopPolicy {
                     "lives at " + state.lives() + ", saving for a potion (" + state.gold() + " gold)");
         }
 
-        int reserve = potion.map(ShopItem::cost).orElse(upgradeGoldReserve);
+        // At least a potion's price is always kept back; the configured reserve can raise that.
+        int reserve = Math.max(potion.map(ShopItem::cost).orElse(0), upgradeGoldReserve);
         int spendable = state.gold() - reserve;
         Optional<ShopItem> upgrade = shop.stream()
                 .filter(ShopItem::isUpgrade)
