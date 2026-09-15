@@ -124,6 +124,24 @@ budget covers that — otherwise it spends every turn it has and still ends up t
 just poorer. The player's panel shows the same number ("board changes in 3 turns"), because without
 it passing looks like it does nothing, which for any single turn is very nearly true.
 
+Then I measured how often the bot actually needs it, and the answer is that it does not. Across 154
+turns of realistic play, the number of turns where every ad on the board sat below the survival
+floor was **zero**. The reason is arithmetic: at one life the floor is 0.80, which "Piece of cake"
+(0.91) and "Walk in the park" (0.84) clear, and those two are about 43% of everything posted. The
+chance that none of ten ads is one of them is around 0.4% — one turn in two hundred and fifty — and
+the bot also has to be too poor for a potion before waiting even comes up. The same run showed the
+soonest expiry on a played board has a median of 1, so the board is turning over almost every turn
+anyway; the seven static turns I first measured only happen on a virgin board where all ten ads
+share one expiry.
+
+So the honest status of the automatic half of this is: correct, tested, and very nearly dead code.
+Its usefulness is a direct function of how strict the survival floor is, which is the same dial I
+already suspect is set too cautiously — raise the floor and waiting starts to matter, lower it and
+waiting never fires at all. I have left it in because it costs one branch and covers the case where
+the run would otherwise be thrown away, but I am not going to claim it earns its place on the
+numbers. The player-facing button is a different matter: a person can pass for their own reasons,
+and giving them the same moves the bot has is worth it regardless of how often the bot uses one.
+
 It is budgeted at ten turns per run rather than unlimited, for the same reason the shop policy buys
 upgrades: once a dragon is levelled a turn is worth a couple of hundred gold, and a run that waits
 forever on a board that never improves has only found a slower way to score nothing. Past the
@@ -238,11 +256,10 @@ generic dark mode: the paper goes to soot and the ink to warm bone.
   The middle four labels are separated by a few percentage points on samples in the twenties and
   thirties, and I would not be surprised if a 5,000-attempt sample reordered them. The strategy is
   not very sensitive to that, but the numbers in `RiskLevel` are more confident than the data is.
-- **Waiting out a turn is reasoned, not measured.** The argument for it is sound on paper — a life
-  is worth more than a turn when the board is hopeless — and it is covered by tests, but I only got
-  three games through the benchmark before Mugloar's per-IP limit put me in minute-long backoffs,
-  and three games is not a result. Whether ten is the right budget, or whether it should scale with
-  dragon level now that a turn is worth a couple of hundred gold, is unanswered.
+- **The bot's waiting move is very nearly dead code.** Measured at zero triggers in 154 turns, for
+  the reasons above. It is right rather than useful, and the budget of ten is a number I picked
+  rather than one I fitted. If the survival floor gets relaxed — which I think it should — this can
+  probably go entirely.
 - **The survival floor probably costs more than it saves.** It is the main thing separating the two
   strategies and the benchmark does not show it paying for itself. Relaxing it, or making it depend
   on how much gold is banked rather than only on lives, is the first experiment I would run.
