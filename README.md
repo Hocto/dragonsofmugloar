@@ -133,7 +133,10 @@ is a photograph, a red title and plain body text, with torn parchment sheets and
 into it; I took the parchment and built the whole interface out of it. Warm paper, ink text, one wax
 red for anything urgent or lost, one gold for money, and nothing else gets a colour, which is what
 keeps the red meaningful when an ad is about to expire. Type is system serif stacks rather than a
-web font, so it works with no network inside a container.
+web font, so it works with no network inside a container. The start screen carries the site's own
+dragon sketch, full bleed: it is Bigbank's artwork (drawing by Nele Sergejeva, © 2018 Bigbank AS),
+resized to a 235 KB WebP and credited on screen. It is the one asset in the repository that is not
+mine.
 
 ## Rough edges
 
