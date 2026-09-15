@@ -74,7 +74,8 @@ const emit = defineEmits<{ start: [mode: RunMode] }>()
 .intro__art {
   position: fixed;
   inset: 0;
-  background: url('/art/dragon-in-barn.webp') no-repeat 20% 60% / cover;
+  /* Imported from src/assets so Vite fingerprints it into /assets/, where nginx's immutable cache rule applies. */
+  background: url('../assets/art/dragon-in-barn.webp') no-repeat 20% 60% / cover;
   z-index: -1;
 }
 
@@ -134,6 +135,8 @@ const emit = defineEmits<{ start: [mode: RunMode] }>()
   }
 
   .intro__art {
+    /* A narrow viewport shows a fraction of the sheet; the 900px file is plenty and half the bytes. */
+    background-image: url('../assets/art/dragon-in-barn-900.webp');
     background-position: 30% 70%;
   }
 }

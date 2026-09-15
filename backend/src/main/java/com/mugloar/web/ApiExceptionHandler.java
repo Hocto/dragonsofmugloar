@@ -5,7 +5,9 @@ import com.mugloar.web.dto.ApiError;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.ErrorResponse;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -69,9 +71,20 @@ public class ApiExceptionHandler {
                 .body(ApiError.of("INVALID_REQUEST", "Request body was not valid", false));
     }
 
-    /** Any other exception. The client gets the {@link ApiError} shape without the detail, which is logged. */
+    /**
+     * Everything else. Spring's own HTTP errors (405 for a wrong method, 404 for an unknown path,
+     * 415 for a wrong content type) implement {@link ErrorResponse} and keep their status; only
+     * the body is reshaped. Anything unanticipated is a 500 with the detail logged, not returned.
+     */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> unexpected(Exception e) {
+        if (e instanceof ErrorResponse spring) {
+            HttpStatusCode status = spring.getStatusCode();
+            HttpStatus known = HttpStatus.resolve(status.value());
+            String reason = known != null ? known.getReasonPhrase() : "Request could not be handled";
+            return ResponseEntity.status(status)
+                    .body(ApiError.of("HTTP_" + status.value(), reason, false));
+        }
         log.error("unexpected.error", e);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiError.of("INTERNAL", "Something went wrong on our side.", false));

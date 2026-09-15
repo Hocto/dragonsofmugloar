@@ -8,6 +8,7 @@ import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -236,6 +237,28 @@ class RunControllerTest {
         mvc.perform(get("/api/runs/g1"))
                 .andExpect(status().isBadGateway())
                 .andExpect(jsonPath("$.retryable").value(false));
+    }
+
+    @Test
+    void aWrongMethodIs405NotA500() throws Exception {
+        mvc.perform(put("/api/runs/g1"))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(jsonPath("$.error").value("HTTP_405"))
+                .andExpect(jsonPath("$.retryable").value(false));
+    }
+
+    @Test
+    void anUnknownPathIs404NotA500() throws Exception {
+        mvc.perform(get("/api/nope"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("HTTP_404"));
+    }
+
+    @Test
+    void aWrongContentTypeIs415NotA500() throws Exception {
+        mvc.perform(post("/api/runs").contentType(MediaType.TEXT_PLAIN).content("mode=AUTO"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(jsonPath("$.error").value("HTTP_415"));
     }
 
     @Test
