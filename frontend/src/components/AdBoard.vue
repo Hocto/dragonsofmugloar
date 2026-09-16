@@ -1,0 +1,105 @@
+<script setup lang="ts">
+import { computed } from 'vue'
+import AdCard from './AdCard.vue'
+import type { AdView } from '@/api/types'
+
+const props = defineProps<{
+  ads: AdView[]
+  actionable: boolean
+  pendingAdId: string | null
+  busy: boolean
+}>()
+
+/**
+ * Animates the board only in manual mode. In auto mode the board is replaced several times a
+ * second, and a backgrounded tab pauses animation frames, which strands Vue's leave transition and
+ * leaves the elements in the DOM.
+ */
+const animated = computed(() => props.actionable)
+
+const emit = defineEmits<{ solve: [adId: string] }>()
+
+/** Most urgent first, then most valuable. */
+const ordered = computed(() =>
+  [...props.ads].sort((a, b) => a.expiresIn - b.expiresIn || b.reward - a.reward),
+)
+</script>
+
+<template>
+  <section class="board" aria-labelledby="board-heading">
+    <h2 id="board-heading" class="board__heading">The message board</h2>
+
+    <p v-if="ads.length === 0" class="board__empty">
+      Nothing pinned up right now.
+    </p>
+
+    <!-- Keyed by adId so Vue moves cards rather than rebuilding them. -->
+    <TransitionGroup v-else tag="ul" name="notice" class="board__list" :css="animated">
+      <AdCard
+        v-for="ad in ordered"
+        :key="ad.adId"
+        :ad="ad"
+        :actionable="actionable"
+        :pending="pendingAdId === ad.adId"
+        :disabled="busy"
+        @solve="emit('solve', $event)"
+      />
+    </TransitionGroup>
+  </section>
+</template>
+
+<style scoped>
+.board__heading {
+  font-size: var(--step-2);
+  margin-bottom: var(--gap-3);
+  padding-bottom: var(--gap-1);
+  border-bottom: 1px solid var(--rule);
+}
+
+.board__empty {
+  color: var(--ink-faint);
+  font-style: italic;
+}
+
+.board__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: var(--gap-3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  /* Leaving cards are absolutely positioned, so they need this to have something to sit inside. */
+  position: relative;
+}
+
+/* A slightly different tilt per card. */
+.board__list > :nth-child(3n + 1) {
+  --tilt: -0.5deg;
+}
+.board__list > :nth-child(3n + 2) {
+  --tilt: 0.4deg;
+}
+.board__list > :nth-child(3n) {
+  --tilt: -0.2deg;
+}
+
+.notice-enter-active,
+.notice-leave-active {
+  transition: opacity 260ms ease, transform 260ms ease;
+}
+
+.notice-enter-from {
+  opacity: 0;
+  transform: translateY(-6px) rotate(var(--tilt, 0deg));
+}
+
+/* Expiring notices lift off the board. */
+.notice-leave-to {
+  opacity: 0;
+  transform: translateY(-14px) rotate(calc(var(--tilt, 0deg) - 2deg));
+}
+
+.notice-leave-active {
+  position: absolute;
+}
+</style>

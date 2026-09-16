@@ -1,0 +1,97 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: dragonsofmugloar
+  threads:
+    # Every run holds a thread while it waits on Mugloar. Virtual threads make "a few hundred
+    # concurrent runs" a non-question instead of a tuning exercise.
+    virtual:
+      enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+mugloar:
+  api:
+    base-url: https://dragonsofmugloar.com/api/v2
+    connect-timeout: 3s
+    read-timeout: 10s
+    retry:
+      # Mugloar rate limits hard once you run games in parallel, so the retry budget is generous
+      # and the ceiling is high enough to actually wait one out.
+      max-attempts: 5
+      initial-backoff: 400ms
+      multiplier: 2.0
+      max-backoff: 8s
+
+  strategy:
+    name: expected-value
+    urgency-weight: 1.6
+    healing-threshold-lives: 2
+    upgrade-gold-reserve: 50
+    # When the whole board is below the survival floor and there is no gold for a potion, a run may
+    # give up the turn instead of gambling a life. Budgeted, because waiting forever on a board that
+    # never improves is just a slower way to score nothing - and by the time a dragon is levelled a
+    # turn is worth a couple of hundred gold, so the budget is deliberately small. 0 turns it off.
+    max-idle-turns: 10
+
+  benchmark:
+    games: 100
+    concurrency: 3
+    start-stagger: 1200ms
+    target-score: 1000
+
+  web:
+    # The dev server. In Docker the frontend is served same-origin by nginx, so this is only
+    # loosened for `npm run dev`.
+    allowed-origins: http://localhost:5173
+    # Slow enough that a person can read the turn feed, fast enough not to feel broken.
+    auto-turn-delay: 350ms
+    max-runs: 200
+    stream-timeout: 30m
+
+logging:
+  level:
+    com.mugloar: INFO
+  pattern:
+    console: "%d{HH:mm:ss.SSS} %-5level %logger{20} - %msg%n"
+
+---
+spring:
+  config:
+    activate:
+      on-profile: benchmark
+  main:
+    web-application-type: none
+mugloar:
+  api:
+    retry:
+      # A Cloudflare 1015 lasts a lot longer than a normal 429, so the benchmark waits it out
+      # rather than burning its attempts in six seconds and giving up.
+      max-attempts: 8
+      initial-backoff: 2s
+      multiplier: 2.0
+      max-backoff: 45s
+logging:
+  level:
+    com.mugloar: WARN
+    com.mugloar.benchmark: INFO
+
+---
+spring:
+  config:
+    activate:
+      on-profile: docker
+mugloar:
+  web:
+    # nginx proxies /api, so the browser is same-origin and no cross-origin rule is needed.
+    allowed-origins: []

@@ -1,0 +1,172 @@
+package com.mugloar.benchmark;
+
+import com.mugloar.application.GameMemories;
+import com.mugloar.application.GameOrchestrator;
+import com.mugloar.application.TurnEvent;
+import com.mugloar.application.port.MugloarApiException;
+import com.mugloar.config.BenchmarkProperties;
+import com.mugloar.domain.GameState;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.locks.ReentrantLock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
+import org.springframework.stereotype.Component;
+
+/**
+ * Plays N games headless and reports score statistics ({@code ./gradlew :backend:benchmark
+ * -Pgames=100}). Two throttles apply: a semaphore caps games in flight, and a stagger paces game
+ * starts, because the upstream bans bursts of game starts for longer than any retry budget.
+ */
+@Component
+@Profile("benchmark")
+public class BenchmarkRunner implements CommandLineRunner {
+
+    private static final Logger log = LoggerFactory.getLogger(BenchmarkRunner.class);
+
+    private final GameOrchestrator orchestrator;
+    private final GameMemories memories;
+    private final BenchmarkProperties properties;
+    private final ReentrantLock startLock = new ReentrantLock();
+    private volatile long nextStartAllowedAt;
+
+    public BenchmarkRunner(
+            GameOrchestrator orchestrator, GameMemories memories, BenchmarkProperties properties) {
+        this.orchestrator = orchestrator;
+        this.memories = memories;
+        this.properties = properties;
+    }
+
+    @Override
+    public void run(String... args) {
+        log.info("Playing {} games with strategy '{}' ({} at a time)",
+                properties.games(), orchestrator.strategyName(), properties.concurrency());
+        BenchmarkResult result = play(properties.games());
+        print(result);
+    }
+
+    public BenchmarkResult play(int games) {
+        long startedAt = System.currentTimeMillis();
+        List<Integer> scores = Collections.synchronizedList(new ArrayList<>());
+        List<String> failures = Collections.synchronizedList(new ArrayList<>());
+        Semaphore inFlight = new Semaphore(Math.max(1, properties.concurrency()));
+
+        try (ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor()) {
+            List<Future<?>> pending = new ArrayList<>();
+            for (int i = 0; i < games; i++) {
+                int gameNumber = i + 1;
+                pending.add(pool.submit(throttled(inFlight, () -> {
+                    playOne(gameNumber, scores, failures);
+                    return null;
+                })));
+            }
+            for (Future<?> future : pending) {
+                join(future);
+            }
+        }
+
+        List<Integer> sorted = new ArrayList<>(scores);
+        Collections.sort(sorted);
+        return new BenchmarkResult(
+                sorted, List.copyOf(failures), properties.targetScore(),
+                System.currentTimeMillis() - startedAt);
+    }
+
+    private void playOne(int gameNumber, List<Integer> scores, List<String> failures) {
+        GameState state = null;
+        try {
+            state = staggeredStart();
+            long sequence = 0;
+            while (!state.isOver()) {
+                TurnEvent event = orchestrator.playTurn(state, ++sequence);
+                state = event.state();
+                if (event.endsRun()) {
+                    break;
+                }
+            }
+            scores.add(state.score());
+            log.info("game {}/{} finished score={} turns={}",
+                    gameNumber, properties.games(), state.score(), state.turn());
+        } catch (MugloarApiException e) {
+            // A run killed by the upstream is reported separately rather than as a zero score.
+            failures.add("game %d: %s".formatted(gameNumber, e.getMessage()));
+            log.warn("game {}/{} aborted at score={} status={}",
+                    gameNumber, properties.games(), state == null ? 0 : state.score(), e.status());
+        } finally {
+            if (state != null) {
+                memories.forget(state.gameId());
+            }
+        }
+    }
+
+    /** Serialises and spaces out game starts; everything after the start runs in parallel. */
+    private GameState staggeredStart() {
+        startLock.lock();
+        try {
+            long waitMillis = nextStartAllowedAt - System.currentTimeMillis();
+            if (waitMillis > 0) {
+                Thread.sleep(waitMillis);
+            }
+            nextStartAllowedAt = System.currentTimeMillis() + properties.startStagger().toMillis();
+            return orchestrator.start();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while pacing game starts", e);
+        } finally {
+            startLock.unlock();
+        }
+    }
+
+    private static <T> Callable<T> throttled(Semaphore permits, Callable<T> task) {
+        return () -> {
+            permits.acquire();
+            try {
+                return task.call();
+            } finally {
+                permits.release();
+            }
+        };
+    }
+
+    private static void join(Future<?> future) {
+        try {
+            future.get();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (java.util.concurrent.ExecutionException e) {
+            log.warn("benchmark game blew up", e.getCause());
+        }
+    }
+
+    private void print(BenchmarkResult result) {
+        String report = """
+
+                Strategy       %s
+                Games played   %d (%d aborted upstream)
+                Average score  %.1f
+                Median score   %d
+                Min / Max      %d / %d
+                p10 / p90      %d / %d
+                Cleared %d     %.1f%% of runs
+                Wall clock     %.1fs
+                """.formatted(
+                orchestrator.strategyName(),
+                result.played(), result.failures().size(),
+                result.average(),
+                result.median(),
+                result.min(), result.max(),
+                result.percentile(10), result.percentile(90),
+                result.targetScore(), result.shareClearingTarget() * 100,
+                result.elapsedMillis() / 1000.0);
+        log.info(report);
+        result.failures().forEach(failure -> log.info("  aborted: {}", failure));
+    }
+}
